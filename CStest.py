@@ -1,4 +1,4 @@
-##################################################################################################################
+ ##################################################################################################################
 import os
 import re
 import time
@@ -120,7 +120,7 @@ complete_code = {} #Dictionary to hold all the code in the game
 for file in list_of_files: #Uses the list of files to allow us to cycle through all the files in the project
     file_path = project_path + '\\' + file #Constructs the file path for the specific file
     try:
-        with open(file_path) as cs_file:
+        with open(file_path, encoding = 'utf-8') as cs_file:
             code = cs_file.readlines() #Reads each line of the file in as a list of strings
     except:
         print ("******************************************************************************************\
@@ -196,7 +196,9 @@ for original_string in complete_code['startup.txt']: #Take all the lines of code
             list_of_variables.append ([original_string[0], variable]) #Append to our list, taking the row number from the original string
 
 created_variables['startup.txt'] = list_of_variables #Add the list of variables as a value in the dictionary with the key being the startup.txt file name
-duplicate_variables['startup.txt'] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
+
+if list_of_duplicate_variables:
+    duplicate_variables['startup.txt'] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
 
 
 for file, code in complete_code.items(): #Now loop through all the files to look for temp variables in the remainder of the code. We want to bypass the startup file as we have already handled it
@@ -213,7 +215,9 @@ for file, code in complete_code.items(): #Now loop through all the files to look
                 else:
                     list_of_variables.append ([original_string[0], variable]) # Create a list of all variable names in the file which follow the *temp command
         created_variables[file] = list_of_variables # Add the list of variables as a value in the dictionary with the key being the file name
-        duplicate_variables[file] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
+
+        if list_of_duplicate_variables:
+            duplicate_variables[file] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
 
 print ("Finished identifying all created and temp variable names in codebase\
        \n")
@@ -232,7 +236,7 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
     bracket_variables_in_string = [] #A list to hold all the variables utilising [] in their names to be handled separately
 
     strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF',\
-                                   '*ELSE', '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£'] #All valid characters that need to be cleaned out of strings
+                                   '*ELSE', '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT'] #All valid characters that need to be cleaned out of strings
     for string_to_remove in strings_to_remove_from_commands:
         string = string.replace(string_to_remove,' ') #Remove the characters so that we are, as best as possible, just left with variable names.
         
@@ -381,7 +385,7 @@ called_bracket_variables = {}
 
 for file, code in complete_code.items(): #Gives us the entire list of lists containing all the code in each file
     print ("Finding variables in: " + file)
-    time.sleep(0.5)
+    time.sleep(0.1)
     
     variables_in_file = [] #Creates our master list to store all the variables called in the file. We will pass this in and out of the functions
     bracket_variables_in_file = [] #Creates our master list to store all the bracket variables called in the file. We will pass this in and out of the functions
@@ -432,28 +436,38 @@ time.sleep(0.5)
 
 ##################################################################################################################
 #Check for whether there are any created variables that are not called in the code.
-variables_not_called = []
+
+variables_not_called = {}
 
 for created_file, created_variable_row in created_variables.items(): #Loop through all the files
+    variables_not_called_in_file = []
     for created_variable in created_variable_row: #Loop through all the variables created in the file
         variable_found = False #Set the variable as 'not found' to begin with.
         
         for called_file, called_variable_row in called_variables.items(): #Loop through all the files to find if the variable is called in it
             if created_file == 'startup.txt' or called_file == created_file: #Only compare variables defined in the startup (which can be called anywhere), or variables defined in the SAME file we're checking (for temp variables)         
-                for called_variable in called_variable_row: #Loop through all the called variables in the file
-                    if variable_found == False: #If we haven't already found it
-                        if created_variable[1] == called_variable[1]: #And the variable we are currently comparing matches the one we are searching for. Here we take the second element of the list, as the first element is the row number
-                            variable_found = True #Then set it to 'found'
+                if variable_found == False: #If we haven't already found it
+                    for called_variable in called_variable_row: #Loop through all the called variables in the file
+                        if variable_found == False: #If we haven't already found it
+                            if created_variable[1] == called_variable[1]: #And the variable we are currently comparing matches the one we are searching for. Here we take the second element of the list, as the first element is the row number
+                                variable_found = True #Then set it to 'found'
 
-        for called_bracket_file, called_bracket_variable_row in bracket_variables.items(): #Repeat for the bracket variables
+        for called_bracket_file, called_bracket_variable_row in called_bracket_variables.items(): #Repeat for the bracket variables
             if created_file == 'startup.txt' or called_bracket_file == created_file:
-                for called_bracket_variable in called_bracket_variable_row:
-                    if created_variable[1].split('_')[0] == called_bracket_variable[1].split('[')[0]: #Difference here is we split the variables before the _ and brackets and simply match on the stub
-                        variable_found == True
+                if variable_found == False: #If we haven't already found it
+                    for called_bracket_variable in called_bracket_variable_row:
+                        if variable_found == False:
+                            if created_variable[1].split('_')[0] == called_bracket_variable[1].split('[')[0]: #Difference here is we split the variables before the _ and brackets and simply match on the stub rather than the full variable name
+                                variable_found == True
 
         if variable_found == False: #After looking for the variable in every file and not finding it, add it as a non-called variable             
-            variables_not_called.append([created_file, created_variable[1], created_variable[0]])  
-       
+            variables_not_called_in_file.append([created_variable[1], created_variable[0]])
+
+    if variables_not_called:
+        variables_not_called[file] = variables_not_called
+
+print ("Finished finding all variables that were defined but never called")
+time.sleep(0.25)
 ##################################################################################################################
 
 
@@ -461,117 +475,250 @@ for created_file, created_variable_row in created_variables.items(): #Loop throu
 ##################################################################################################################
 #Check for any called variables which are not defined in the startup or are not defined in the same file (temp)
 #Also, where it is a temp variable, it also checks if it was defined on a later row number than the one it was called on
-variables_not_defined = []
+variables_not_defined = {}
+variables_called_before_defined = {}
 variables_defined_in_startup = []
-variables_called_before_defined = []
 
 for called_file, called_variable_row in called_variables.items(): #Loop through our files
+    variables_not_defined_in_project = []
+    variables_called_before_defined_in_project = []
     for called_variable in called_variable_row: #Loop through each called variable in the file
         if called_variable[1] not in variables_defined_in_startup: #If the variable name is in our list (generated in these loops), then we already know it has been defined and can be skipped
             variable_defined = False #Set variable as not defined, until we see that it is
             
-            for created_file, created_variable_row in created_variables.items(): #Loop through each file
-     
+            for created_file, created_variable_row in created_variables.items(): #Loop through each file     
                 if created_file == 'startup.txt' or called_file == created_file: #If the file is startup or the same file we are checking, then proceed (we don't want to check temp variables in other files)
-                    for created_variable in created_variable_row: #Loop through each created variable in that file
-                        if variable_defined == False: #If we haven't se the variable to defined yet
-                            if called_variable[1] == created_variable[1]: #Then check if the variable we are checking matches the one we are searching for
-                                variable_defined = True #And if so, set it to 'defined'
-                                row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
-                                if created_file == 'startup.txt':
-                                    variables_defined_in_startup.append(called_variable[1]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
-      
+                    if variable_defined == False: #If we haven't already found it
+                        for created_variable in created_variable_row: #Loop through each created variable in that file
+                            if variable_defined == False: #If we haven't se the variable to defined yet
+                                if called_variable[1] == created_variable[1]: #Then check if the variable we are checking matches the one we are searching for
+                                    variable_defined = True #And if so, set it to 'defined'
+                                    row_defined_on = 0
+                                    if created_file != 'startup.txt':
+                                        row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
+                                    if created_file == 'startup.txt':
+                                        variables_defined_in_startup.append(called_variable[1]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
+          
             if variable_defined == False: #If we get through all the files and we never find the variable, add it as a non-defined variable
-                variables_not_defined.append([called_file, called_variable[1], called_variable[0]])
+                variables_not_defined_in_project.append([called_variable[1], called_variable[0]])
             else:
                 if called_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
-                    variables_called_before_defined.append ([called_file, called_variable[1], called_variable[0], row_defined_on])
+                    variables_called_before_defined_in_project.append ([called_variable[1], called_variable[0], row_defined_on])
+
+    if variables_not_defined_in_project:
+        variables_not_defined[file] = variables_not_defined_in_project
+
+    if variables_called_before_defined_in_project:
+        variables_called_before_defined[file] = variables_called_before_defined_in_project
                 
 
-#DO WE ADD MORE FUNCTIONALITY BELOW
+#Repeat for the bracket variables. The main difference here is we just match on the stub of the variable name before the _ or [.
+#This just means we don't match the exact variable name, but there is nothing to be done about that.
 
-#Repeat for the bracket variables. The main difference here is we just match on the stub. So we don't record whether it was called before defined and so on, because
-# we are not matching exactly on the variable names
-for called_bracket_file, called_bracket_variable_row in bracket_variables.items():
-    for called_bracket_variable in called_bracket_variable_row:            
-        for created_file, created_variable_row in created_variables.items():
-            if created_file == 'startup.txt' or called_file == created_file:
-                for created_variable in created_variable_row:
-                    if variable_defined == False:
-                        if called_bracket_variable[1].split('[')[0] == created_variable[1].split('_')[0]:
-                            variable_defined = True
+bracket_variables_not_defined = {}
+bracket_variables_called_before_defined = {}
+    
+for called_bracket_file, called_bracket_variable_row in called_bracket_variables.items():
+    bracket_variables_not_defined_in_project = []
+    bracket_variables_called_before_defined_in_project = []
+    for called_bracket_variable in called_bracket_variable_row:
+        if called_variable[1].split('[')[0] not in variables_defined_in_startup:
+            variable_defined = False
+            for created_file, created_variable_row in created_variables.items():
+                if created_file == 'startup.txt' or called_bracket_file == created_file:
+                    if variable_defined == False: #If we haven't already found it
+                        for created_variable in created_variable_row:
+                            if variable_defined == False:
+                                if called_bracket_variable[1].split('[')[0] == created_variable[1].split('_')[0]:
+                                    variable_defined = True
+                                    row_defined_on = 0
+                                    if created_file != 'startup.txt':
+                                        row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
+                                    if created_file == 'startup.txt':
+                                        variables_defined_in_startup.append(called_bracket_variable[1].split('[')[0]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
                             
         if variable_defined == False:
-            variables_not_defined.append([called__bracket_file, called_bracket_variable[1], called_bracket_variable[0]])
-
-
-##################################################################################################################
-
-
-##################################################################################################################
-
-# Parse the complete code to measure the indents on each line to spot cases where potentially the indent is incorrect
-
-invalid_indents = {}
-potentially_invalid_indents = {}
-required_indent = False
-
-for file, code in complete_code.items():
-
-    file_invalid_indents = []
-    file_potentially_invalid_indents = []
-    expected_indent = 0
-    
-    for original_string in code:
-
-        string = original_string[1]
-
-        allowed_indents = [0]
-
-        if ((len(string) - len(string.lstrip(' '))) % 4 == 0) or (len(string) - len(string.lstrip(' ')) == 0):           
-            
-            indent_calculator = expected_indent
-            while indent_calculator > 0:
-                allowed_indents.append (indent_calculator)
-                indent_calculator -= 4
-
-            if len(string) - len(string.lstrip(' ')) not in allowed_indents:
-                file_potentially_invalid_indents.append([original_string[0], string])
-
-            else:
-                if required_indent == True:
-                    required_indent = False
-                    if len(string) - len(string.lstrip(' ')) != expected_indent:
-                        file_invalid_indents.append([original_string[0], string])   
-
+            bracket_variables_not_defined_in_project.append([called_bracket_file, called_bracket_variable[1], called_bracket_variable[0]])
         else:
-            file_invalid_indents.append([original_string[0], string])
+            if called_bracket_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
+                bracket_variables_called_before_defined_in_project.append ([called_bracket_variable[1], called_bracket_variable[0], row_defined_on])
 
-        if len(string) - len(string.lstrip(' ')) in allowed_indents and expected_indent != 0:
-            expected_indent = len(string) - len(string.lstrip(' '))
+    if bracket_variables_not_defined_in_project:
+        bracket_variables_not_defined[file] = bracket_variables_not_defined_in_project
 
-        no_space_string = string.lstrip(' ')
-        if (no_space_string.startswith('*IF') or no_space_string.startswith('*ELSEIF') or no_space_string.startswith('*ELSE') or no_space_string.startswith('*SELECTABLE_IF') or no_space_string.startswith('*CHOICE') or \
-            no_space_string.startswith('*FAKE_CHOICE') or no_space_string.startswith('#')):
+    if bracket_variables_called_before_defined_in_project:
+        bracket_variables_called_before_defined[file] = bracket_variables_called_before_defined_in_project
 
-            required_indent = True
-            expected_indent += 4
-
-    invalid_indents[file] = file_invalid_indents
-    potentially_invalid_indents[file] = file_potentially_invalid_indents
+print ("Finished finding all variables that were called but never defined")
+time.sleep(0.25)
+##################################################################################################################
 
 
-print (invalid_indents)
-print ("\n")
-print (potentially_invalid_indents)
-print ("\n")
-print (variables_called_before_defined)
-print ("\n")
-print (variables_not_defined)
-print ("\n")
-print (variables_not_called)
+        
+##################################################################################################################
+#Parse the complete code to measure the indents on each line to spot cases where potentially the indent is incorrect
+#Dictionaries to store all the indent outcomes
+consistency_indents = {}
+invalid_indents = {}
 
-duplicate_variables
+project_base_indent = 0 #To determine which indents are not consistent, this stores the 'base' indent increment for the project
+
+previous_prose = False #Whether the previous line was prose
+previous_command = False #Whether the previous line was just a command
+current_prose = False #Whether the current line is prose
+current_command = False #Whether the current line is just a command
+
+in_choice = False #Whether a choice block is being evaluated
+in_option = False #Whether an option block is being evaluated
+choice_indent = 0
+option_indent = 0
+previous_option_indent = 0
+
+
+for file, code in complete_code.items(): #Loop through each file
+    file_consistent_indents = [] #Lists to capture the invalid indents in the file
+    file_invalid_indents = [] 
+    file_potentially_invalid_indents = []
+
+    expected_indent = 0 #First line will always be expected to have no indent
+    previous_indent = 0 #File always starts without a previous indent
+    first_option = False
+
+    for original_string in code: #Loops through each string
+        string = original_string[1] #Takes just the string, leaving the row number
+        no_space_string = string.lstrip() #Strip the indent so we can check what the string actually starts with
+
+        actual_indent = len(string) - len(string.lstrip(' '))
+        current_prose = False
+        current_command = False
+        option_line = False
+        comment_line = False
+
+        if in_choice == True and actual_indent <= choice_indent:
+            in_choice = False
+            in_option = False
+            choice_indent = 0
+            option_indent = 0
+            previous_option_indent = 0
+            first_option = False
+
+        if in_option == True and ((no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF')) or\
+                                  (no_space_string.startswith('*IF') and actual_indent > choice_indent and actual_indent < option_indent)):
+            in_option = False
+            previous_option_indent = option_indent
+            option_indent = 0
+
+        if (no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE')):
+            in_choice = True
+            choice_indent = actual_indent
+
+        elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF'):
+            in_option = True
+            option_line = True
+            option_indent = actual_indent
+            if first_option == False:
+                first_option = True
+            else:
+                first_option = False
+                        
+        if (no_space_string.startswith('*') or option_line == True):
+            if '*COMMENT' in no_space_string:
+                comment_line = True
+            else:
+                current_command = True #If it is any other command
+              
+        else:
+            current_prose = True #If it is prose
+
+
+        if option_line == True:
+            if actual_indent <= choice_indent and comment_line == False:
+                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block must have a greater indent than the *choice command', choice_indent, actual_indent])
+
+            if actual_indent > previous_option_indent and first_option == False and comment_line == False:
+                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block can not have a greater indent that previous options', previous_option_indent, actual_indent])
+
+        if in_option == True and option_line == False and comment_line == False:
+            if actual_indent <= option_indent:
+                file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indent, actual_indent])
+                
+            
+        if previous_prose == True:
+            if actual_indent != previous_indent and option_line == False and comment_line == False:
+                file_invalid_indents.append([string, original_string[0], 'Prose and command lines following prose must have the same indent', previous_indent, actual_indent])
+
+        previous_prose = current_prose
+        previous_indent = actual_indent
+
+
+    invalid_indents[file] = file_invalid_indents                          
+            
+            
+#What about choices / commands with choices?
+#How do we know we have finished the choice block?
+#Fake choices?
+# Falling out of choices
+
+
+
+
+#Consistency - identify a base indent amount and evaluate against it
+#- choice blocks should all be equal
+#Something after an *if
+
+
+
+print ("Finished finding all lines of code that were improperly indented")
+time.sleep(0.25)
+##################################################################################################################
+
+
+
+##################################################################################################################
+#Output all the test outcomes into a single file
+
+variable_output = []
+
+#duplicate variables
+for file, duplicate_variables in duplicate_variables.items():
+    for duplicate_variable in duplicate_variables:
+        variable_output.append(['duplicate variable', file, duplicate_variable[0], duplicate_variable[1]])
+#variables not called
+for file, variables_not_called in variables_not_called.items():
+    for variable_not_called in variables_not_called:
+        variable_output.append(['variable not called', file, variable_not_called[0], variable_not_called[1]])
+#variables not defined
+for file, variables_not_defined in variables_not_defined.items():
+    for variable_not_defined in variables_not_defined:
+        variable_output.append(['variable not defined', file, variable_not_defined[0], variable_not_defined[1]])
+#bracket variables not defined
+for file, bracket_variables_not_defined in bracket_variables_not_defined.items():
+    for bracket_variable_not_defined in bracket_variables_not_defined:
+        variable_output.append(['variable not defined', file, bracket_variable_not_defined[0], bracket_variable_not_defined[1]])
+#variables called before defined
+for file, variables_called_before_defined in variables_called_before_defined.items():
+    for variable_called_before_defined in variables_called_before_defined:
+        variable_output.append(['variable called before defined', file, variable_called_before_defined[0], variable_called_before_defined[1]])
+#bracket variables called before defined
+for file, bracket_variables_called_before_defined in bracket_variables_called_before_defined.items():
+    for bracket_variable_called_before_defined in bracket_variables_called_before_defined:
+        variable_output.append(['variable called before defined', file, bracket_variable_called_before_defined[0], bracket_variable_called_before_defined[1]])
+
+output_df = pd.DataFrame(variable_output, columns = ['test', 'filename', 'variable_name', 'row_number'])
+os.chdir(test_run_path)
+output_df.to_csv('variable_output.csv')
+
+
+indent_output = []
+
+#invalidindents
+for file, invalid_indents in invalid_indents.items():
+    for invalid_indent in invalid_indents:
+        indent_output.append(['invalid_indent', file, invalid_indent[0], invalid_indent[1], invalid_indent[2], invalid_indent[3], invalid_indent[4]])
+
+indent_output_df = pd.DataFrame(indent_output, columns = ['test', 'filename', 'string', 'row_number', 'error', 'expected_indent', 'actual_indent'])
+indent_output_df.to_csv('indent_output.csv')
+
 
 
 ## Future functionality
@@ -579,6 +726,9 @@ duplicate_variables
 # Missing * on a command
 # Misspelt command
 # Output as complete errors as possible, the command that failed and the stats at that time
+
+#indents - split into inconsistent, potentially invalid and invalid
+#test if the lock on indent length is only per indent (so rests once it hits 0)
 
 
 
@@ -596,16 +746,3 @@ Then parse the code to take each ID in turn and spawn the runs and follow the co
 """
 
 
-
-     
-
-
-
-#if duplicate_variables:
-    #duplicate_variables = pd.DataFrame(duplicate_variables, columns = ['duplicate_variable_name'])
-    
-    #duplicate_variables.to_csv(pathlib.Path(test_run_path, 'duplicate_variables' + '.csv'))
-
-# number_of_files
-
-#variables not called
