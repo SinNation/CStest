@@ -235,7 +235,7 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
     multi_word_string = 'false' #Control within a loop to identify strings containing multiple words
     bracket_variables_in_string = [] #A list to hold all the variables utilising [] in their names to be handled separately
 
-    strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF',\
+    strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF', '*ALLOW_REUSE', '*DISABLE_REUSE', '*HIDE_REUSE'\
                                    '*ELSE', '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT'] #All valid characters that need to be cleaned out of strings
     for string_to_remove in strings_to_remove_from_commands:
         string = string.replace(string_to_remove,' ') #Remove the characters so that we are, as best as possible, just left with variable names.
@@ -570,9 +570,9 @@ current_command = False #Whether the current line is just a command
 
 in_choice = False #Whether a choice block is being evaluated
 in_option = False #Whether an option block is being evaluated
-choice_indent = 0
-option_indent = 0
-previous_option_indent = 0
+previous_option_indent = 0 #The indent of the previous option block
+in_if = False #Whether an if block is being evaluated
+
 
 
 for file, code in complete_code.items(): #Loop through each file
@@ -580,86 +580,155 @@ for file, code in complete_code.items(): #Loop through each file
     file_invalid_indents = [] 
     file_potentially_invalid_indents = []
 
+    choice_indents = [] #List to hold all the indents of each active choice block
+    active_choices = 0 #Total number of active choices being evaluated
+    option_indents = [] #List to hold all the indents of each active option block
+    in_choice = False
+    in_option = False
     expected_indent = 0 #First line will always be expected to have no indent
     previous_indent = 0 #File always starts without a previous indent
-    first_option = False
+    first_option = False #Whether this is the first option in the choice
 
     for original_string in code: #Loops through each string
         string = original_string[1] #Takes just the string, leaving the row number
         no_space_string = string.lstrip() #Strip the indent so we can check what the string actually starts with
 
-        actual_indent = len(string) - len(string.lstrip(' '))
-        current_prose = False
+        actual_indent = len(string) - len(string.lstrip(' ')) #The indent of the string
+        current_prose = False #Resets the flags for the type of string it is
         current_command = False
         option_line = False
-        comment_line = False
+        comment_return_line = False
 
-        if in_choice == True and actual_indent <= choice_indent:
-            in_choice = False
-            in_option = False
-            choice_indent = 0
-            option_indent = 0
-            previous_option_indent = 0
-            first_option = False
+        if in_choice == True: #If currently evaluating a choice block            
+            if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the choice command
+                choice_indents.pop(active_choices - 1) #Then this choice is finished, remove its indent
+                option_indents.pop(active_choices - 1) #And remove the option indent
+                active_choices -= 1 #Total active choices is reduced by one
+                in_option = False #No longer in an option
+                first_option = False #Reset the first option flag
+                if active_choices == 0: #If there are now no active choices, it is no longer evaluating a choice
+                    in_choice = False
 
-        if in_option == True and ((no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF')) or\
-                                  (no_space_string.startswith('*IF') and actual_indent > choice_indent and actual_indent < option_indent)):
-            in_option = False
-            previous_option_indent = option_indent
-            option_indent = 0
+        #If it is evaluating an option and either the current line is a new choice, or the current line is an IF which is inside the choice and outside the current option
+        #Then we are no longer in an option
+        if in_option == True:
+            #A new option block
+            if ((no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF')) or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
+                 (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string)):
+                in_option = False
+                previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
 
+            #An IF block that sits inside the first choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
+            if active_choices == 1:
+                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 1] and actual_indent <= option_indents[active_choices - 1]:
+                    in_option = False
+                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
+
+            #An IF block that sits inside an embedded choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
+            #This scenario is for when it is the first IF, right under the choice. So the choice counter has iterated by 1, but the option has not. 
+            if active_choices > 1 and len(option_indents) < active_choices:
+                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 2] and actual_indent <= option_indents[active_choices - 2]:
+                    in_option = False
+                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
+
+            #An IF block that sits inside an embedded choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
+            if active_choices > 1 and len(option_indents) == active_choices:
+                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 1] and actual_indent <= option_indents[active_choices - 1]:
+                    in_option = False
+                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
+            
+
+        #If it is evaluating an IF and the indent of this line is less than or equal to the IF command, then no longer in an IF
+        if in_if == True and actual_indent <= if_indent:
+            in_if = False
+            if_indent = 0
+            previous_prose = False #This is set because the previous line in an IF could be prose - and this then sets requirements on the existing line (has to have same indent)
+                                   #But as the code comes out of the IF, the indent requirement rests and the presense of the previous prose line is irrelevant
+
+
+        #If the current string is a choice statement, set in_choice, increase active choices and add the indent. This allows for nested choices, each one tracked as an element in the list
         if (no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE')):
             in_choice = True
-            choice_indent = actual_indent
+            active_choices += 1
+            choice_indents.append (actual_indent)
 
-        elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF'):
+        #If the current string is an option, then set in_option and option_line (the line that initiates the option). Then adds the indent of the option to the list
+        elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF') or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
+             (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string):
             in_option = True
             option_line = True
-            option_indent = actual_indent
-            if first_option == False:
-                first_option = True
-            else:
-                first_option = False
-                        
-        if (no_space_string.startswith('*') or option_line == True):
-            if '*COMMENT' in no_space_string:
-                comment_line = True
-            else:
-                current_command = True #If it is any other command
-              
-        else:
-            current_prose = True #If it is prose
+            if len(option_indents) == active_choices: #Each option in a choice must have the same or lower indent than the previous option. If this is the first option for the choice
+                option_indents[active_choices - 1] = actual_indent #Then add it to the list of option indents
 
-
-        if option_line == True:
-            if actual_indent <= choice_indent and comment_line == False:
-                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block must have a greater indent than the *choice command', choice_indent, actual_indent])
-
-            if actual_indent > previous_option_indent and first_option == False and comment_line == False:
-                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block can not have a greater indent that previous options', previous_option_indent, actual_indent])
-
-        if in_option == True and option_line == False and comment_line == False:
-            if actual_indent <= option_indent:
-                file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indent, actual_indent])
+            else: #Otherwise it is a subsequent option, setting the new requirement for the maximum indent of the next option. So overwrite the indent value for this choice block
+                option_indents.append(actual_indent)
                 
-            
+            if first_option == False: #If first option is false, then this must be the first option, so set it
+                first_option = True
+            else: #Otherwise, first option is already set, so this can not be the first option, so un-set it
+                first_option = False
+
+        #If the string starts with an * or is an option line, then evaluate          
+        if (no_space_string.startswith('*') or option_line == True):
+            if '*COMMENT' in no_space_string or '*RETURN' in no_space_string: #If it is a comment or return, then it can ignore indent rules
+                comment_return_line = True
+            elif '*IF' in no_space_string: #If it is an IF command, then we are now evaluating an IF command
+                in_if = True
+                if_indent = actual_indent
+            else: #Otherwise we can just say we're evaluating any other command line
+                current_command = True
+              
+        else: #If none of the above, then it must be prose
+            current_prose = True
+
+        #Above we identify what kind of string we are evaluating. Now we see if the indent is correct.
+
+        #If this is an option line (the line that generates the option), then its indent must not be less than or equal to its calling choice command
+        if option_line == True:
+            if actual_indent <= choice_indents[active_choices -1] and comment_return_line == False:
+                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block must have a greater indent than the *choice command', choice_indents[active_choices - 1], actual_indent])
+
+        #And it must not have a greater indent then the previous option in this block (by checking the list item for the number of choice we are on). If the line is the first option or a comment/return then
+        #we don't check this, as it can have any indent
+            if actual_indent > option_indents[active_choices - 1] and first_option == False and comment_return_line == False:
+                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block can not have a greater indent that previous options', option_indents[active_choices - 1], actual_indent])
+
+
+        #If we are in an option, but not on the option line and it isn't a comment or return
+        if in_option == True and option_line == False and comment_return_line == False:
+            #If this line is a new choice, or an IF statement that is part of a new choice, but before the first option block (i.e. an IF to determine if the option shows)
+            #Then we evaluate the indent of the PREVIOUS option block - because a new choice has been added, but no options yet. So the indent of these only has to be greater
+            #than the original option block.
+            if ((no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE')) or (no_space_string.startswith('*IF') and active_choices > len(option_indents))):
+                if actual_indent <= option_indents[active_choices - 2]:
+                    file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 2], actual_indent])
+            else: #Otherwise, we are looking at an option within a choice block and we just compare against the indent of that option block itself
+                if actual_indent <= option_indents[active_choices - 1]:
+                    file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 1], actual_indent])
+
+        #If this is an IF block and there is no IF in the string (i.e. it's not the originating IF command) then the indent has to be greater than the IF indent
+        #This should actually be impossible to trigger because as soon as the actual indent is the same or less than, we turn off in_if
+        if in_if == True and '*IF' not in no_space_string and actual_indent <= if_indent:
+            file_invalid_indents.append([string, original_string[0], 'The contents of an if statement must have a greater indent than the if command', if_indent, actual_indent])
+
+        #If the previous string was prose, then the following line must have the same indent. Unless it is calling a new option, or is a comment or return line                
         if previous_prose == True:
-            if actual_indent != previous_indent and option_line == False and comment_line == False:
+            if actual_indent != previous_indent and option_line == False and comment_return_line == False:
                 file_invalid_indents.append([string, original_string[0], 'Prose and command lines following prose must have the same indent', previous_indent, actual_indent])
 
+        #Store the previous values
         previous_prose = current_prose
         previous_indent = actual_indent
 
 
     invalid_indents[file] = file_invalid_indents                          
             
+#191 errors
+
             
-#What about choices / commands with choices?
-#How do we know we have finished the choice block?
-#Fake choices?
-# Falling out of choices
-
-
+#Handling nested IFs - in same way as choice and options
+    
+#Falling out of choices and ifs without a goto
 
 
 #Consistency - identify a base indent amount and evaluate against it
@@ -735,7 +804,7 @@ indent_output_df.to_csv('indent_output.csv')
 """
 To parse the schema:
 
-Go through code and find each identifier for a decision in the code (if, selectable_if, choice)
+Go through code and find each identifier for a decision in the code (if, selectable_if, choice, allow_reuse)
 Give each of them a unique ID (might need to store it in the actual code)
 
 Then go through each item and find the ID of the items it links to. Store that in a dictionary format
