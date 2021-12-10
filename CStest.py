@@ -30,7 +30,8 @@ timestamp = datetime.datetime.now()
 ##################################################################################################################
 #Set all the path variables for the location of this code and the CS project
 tests_path = os.getcwd() #Path of the folder containing CStest
-cs_projects_path = os.path.dirname(os.getcwd()) #Parent path, should contain all CS project folders
+cs_projects_path_interim = os.path.dirname(os.getcwd()) #Parent path, should contain all CS project folders
+cs_projects_path = os.path.dirname(cs_projects_path_interim) #Parent path, should contain all CS project folders
 ##################################################################################################################
 
 
