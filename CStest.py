@@ -70,9 +70,6 @@ while correct_folder == False:
         
     if os.path.isdir(project_path) == True:
         correct_folder = True #Sets the variable so the loop breaks and code continues
-        print ("Project folder: " + project_folder + " has been found. CStest will begin.\
-               \n")
-        time.sleep(0.5)
 ##################################################################################################################
 
 
@@ -84,8 +81,6 @@ for file in os.listdir(project_path):
     if file.endswith('.txt'): #Loops through all the files with a .txt extension
        list_of_files.append(file)
 number_of_files = len(list_of_files)
-print (str(number_of_files) + ".txt files have been found in project folder: " + project_folder + "\n")
-time.sleep(0.5)
 ##################################################################################################################
 
 
@@ -106,8 +101,6 @@ except:
            \n")
     input("Press ENTER to exit")
 test_run_path = tests_path+'\\'+project_folder+'\\'+str(timestamp.strftime("%Y-%m%d-%H%M%S"))
-print ("Outcome of tests will be stored in: " + test_run_path + "\n")
-time.sleep(0.5)
 ##################################################################################################################
 
 
@@ -161,12 +154,14 @@ for file in list_of_files: #Uses the list of files to allow us to cycle through 
         input("Press ENTER to exit")
     
     complete_code[file] = numbered_code # Add the code for each file as a list of strings to the dictionary. The key is the file name
-    
-print ("Finished creating the code for all " + str(number_of_files) + ".txt files in the directory.\
-       \n")
-time.sleep(0.5)
-
 ##################################################################################################################
+
+
+
+print ("Project folder: " + project_folder + " has been found.\n")
+print (str(number_of_files) + ".txt files have been found in project folder: " + project_folder + "\n")
+print ("Outcome of tests will be stored in: " + test_run_path + "\n")
+print ("Finished creating the code for all " + str(number_of_files) + ".txt files in the directory.\n")
 
     
 
@@ -219,9 +214,8 @@ for file, code in complete_code.items(): #Now loop through all the files to look
         if list_of_duplicate_variables:
             duplicate_variables[file] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
 
-print ("Finished identifying all created and temp variable names in codebase\
+print ("Identified all created and temp variable names in codebase\
        \n")
-time.sleep(0.5)
 ##################################################################################################################           
 
 
@@ -235,17 +229,18 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
     multi_word_string = 'false' #Control within a loop to identify strings containing multiple words
     bracket_variables_in_string = [] #A list to hold all the variables utilising [] in their names to be handled separately
 
-    strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF', '*ALLOW_REUSE', '*DISABLE_REUSE', '*HIDE_REUSE'\
-                                   '*ELSE', '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT'] #All valid characters that need to be cleaned out of strings
+    strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF', '*ALLOW_REUSE', '*DISABLE_REUSE', '*HIDE_REUSE', '*ELSE'\
+                                       , '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT('] #All valid characters that need to be cleaned out of strings
     for string_to_remove in strings_to_remove_from_commands:
         string = string.replace(string_to_remove,' ') #Remove the characters so that we are, as best as possible, just left with variable names.
-        
+
     # Split the remaining string down into individual words. We need to evaluate each word independently now.
     variables_in_string = string.split() #This is a our baseline for all the variables in the string - we will remove/add as required
 
     try:
         for word in variables_in_string: # Loop through each word and check if it meets any criteria which denotes it as not being a variable
             error_location = ''
+            
             if multi_word_string == 'true': # If a previous word was identified as the start of a multi-word string, then this kicks in and keeps flagging the words until it finds the end of the string
                 error_location = "Looking for end of multi-word string"
                 if (word.endswith("'") or word.endswith('"')): # If the word is the end of the string
@@ -272,7 +267,7 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
                 
             if '[' in word: #'Bracket variables' are cases where a variable name is constructed by referring to another variable value. This identifies these.
                 error_location = "Removing [] words" 
-                bracket_variables_in_string.append(word) #We document the full variable as one to be handled separatelt
+                bracket_variables_in_string.append(word) #We document the full variable as one to be handled separately
                 words_to_remove.append(word) #So we remove it from our list as we will handle it separately                
                 word = (word.split('[')[1]) #We can process the variable name in the brackets though, so split off everything after it
                 word = word.replace(']','') #Replace the closing bracket
@@ -360,12 +355,14 @@ def find_variables_in_prose_strings (variables_in_file, string, bracket_variable
                     if any (word == file_variable[1] for file_variable in variables_in_file): #Leaving us with the variable called in the brackets - first check if we have already added it for the file
                         pass
                     else:
-                        variables_in_file.append([row_number, word]) #Then add it              
+                        variables_in_file.append([row_number, word]) #Then add it
+
                 else:
                     if any (word == file_variable[1] for file_variable in variables_in_file): #Or it had no [] and is just a variable call. Check it isn't alreay added for the file
                         pass
                     else:
                         variables_in_file.append([row_number, word]) #Then add it
+                        
                                 
     return variables_in_file, bracket_variables_in_file #Return the two lists of variables in the file
 ##################################################################################################################
@@ -384,8 +381,6 @@ called_bracket_variables = {}
 #We want to take each line of code and parse it for the variables it calls.
 
 for file, code in complete_code.items(): #Gives us the entire list of lists containing all the code in each file
-    print ("Finding variables in: " + file)
-    time.sleep(0.1)
     
     variables_in_file = [] #Creates our master list to store all the variables called in the file. We will pass this in and out of the functions
     bracket_variables_in_file = [] #Creates our master list to store all the bracket variables called in the file. We will pass this in and out of the functions
@@ -400,13 +395,14 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
         string = re.sub(r'\bOR\b'   , '', string) #Remove 'or' where it is a standalone word and not part of a longer word
         string = re.sub(r'\bTRUE\b' , '', string) #Remove 'true' where it is a standalone word and not part of a longer word
         string = re.sub(r'\bFALSE\b', '', string) #Remove 'false' where it is a standalone word and not part of a longer word
+        string = re.sub(r'\bNOT\b'  , '', string) #Remove 'not' where it is a standalone word and not part of a longer word
         
         #Strip all the white space at the start of the string, allows us to correctly evaluate the first character of the string
         string = string.lstrip()
 
         #Identify if the a command string and if so, pass to the command function
         if (string.startswith('*IF') or string.startswith('*SET') or string.startswith('*ELSEIF') or string.startswith('*ELSE') or string.startswith('*INPUT_TEXT') or string.startswith('*INPUT_NUMBER')):
-            variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, original_string[0]) #Pass in the cleansed string and the original row number
+             variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, original_string[0]) #Pass in the cleansed string and the original row number
 
         #If the command is a '*selectable_if' string, then split the string and pass the command half and prose half to the functions respectively
         elif string.startswith ('*SELECTABLE_IF'):
@@ -428,8 +424,7 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
     if bracket_variables_in_file: #Do the same for the bracket variables
         called_bracket_variables [file] = bracket_variables_in_file
 
-print ("Finished finding variables in all files.")
-time.sleep(0.5)
+print ("Finished finding all variables called in all files.")
 ##################################################################################################################
 
 
@@ -467,7 +462,6 @@ for created_file, created_variable_row in created_variables.items(): #Loop throu
         variables_not_called[file] = variables_not_called
 
 print ("Finished finding all variables that were defined but never called")
-time.sleep(0.25)
 ##################################################################################################################
 
 
@@ -550,7 +544,6 @@ for called_bracket_file, called_bracket_variable_row in called_bracket_variables
         bracket_variables_called_before_defined[file] = bracket_variables_called_before_defined_in_project
 
 print ("Finished finding all variables that were called but never defined")
-time.sleep(0.25)
 ##################################################################################################################
 
 
@@ -583,8 +576,11 @@ for file, code in complete_code.items(): #Loop through each file
     choice_indents = [] #List to hold all the indents of each active choice block
     active_choices = 0 #Total number of active choices being evaluated
     option_indents = [] #List to hold all the indents of each active option block
+    if_indents = []
+    active_ifs = 0
     in_choice = False
     in_option = False
+    in_if = False
     expected_indent = 0 #First line will always be expected to have no indent
     previous_indent = 0 #File always starts without a previous indent
     first_option = False #Whether this is the first option in the choice
@@ -599,15 +595,17 @@ for file, code in complete_code.items(): #Loop through each file
         option_line = False
         comment_return_line = False
 
-        if in_choice == True: #If currently evaluating a choice block            
-            if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the choice command
-                choice_indents.pop(active_choices - 1) #Then this choice is finished, remove its indent
-                option_indents.pop(active_choices - 1) #And remove the option indent
-                active_choices -= 1 #Total active choices is reduced by one
-                in_option = False #No longer in an option
-                first_option = False #Reset the first option flag
-                if active_choices == 0: #If there are now no active choices, it is no longer evaluating a choice
-                    in_choice = False
+        for count in range (active_choices):
+            if in_choice == True: #If currently evaluating a choice block
+                if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the choice command
+                    choice_indents.pop(active_choices - 1) #Then this choice is finished, remove its indent
+                    option_indents.pop(active_choices - 1) #And remove the option indent
+                    active_choices -= 1 #Total active choices is reduced by one
+                    in_option = False #No longer in an option
+                    first_option = False #Reset the first option flag
+                    previous_prose = False
+                    if active_choices == 0: #If there are now no active choices, it is no longer evaluating a choice
+                        in_choice = False
 
         #If it is evaluating an option and either the current line is a new choice, or the current line is an IF which is inside the choice and outside the current option
         #Then we are no longer in an option
@@ -639,11 +637,14 @@ for file, code in complete_code.items(): #Loop through each file
             
 
         #If it is evaluating an IF and the indent of this line is less than or equal to the IF command, then no longer in an IF
-        if in_if == True and actual_indent <= if_indent:
-            in_if = False
-            if_indent = 0
-            previous_prose = False #This is set because the previous line in an IF could be prose - and this then sets requirements on the existing line (has to have same indent)
-                                   #But as the code comes out of the IF, the indent requirement rests and the presense of the previous prose line is irrelevant
+        for count in range (active_ifs):
+            if in_if == True and actual_indent <= if_indents[active_ifs - 1]:
+                if_indents.pop(active_ifs - 1)   
+                active_ifs -= 1
+                if active_ifs == 0:
+                    in_if = False
+                previous_prose = False #This is set because the previous line in an IF could be prose - and this then sets requirements on the existing line (has to have same indent)
+                                        #But as the code comes out of the IF, the indent requirement rests and the presense of the previous prose line is irrelevant
 
 
         #If the current string is a choice statement, set in_choice, increase active choices and add the indent. This allows for nested choices, each one tracked as an element in the list
@@ -651,6 +652,7 @@ for file, code in complete_code.items(): #Loop through each file
             in_choice = True
             active_choices += 1
             choice_indents.append (actual_indent)
+            previous_prose = False
 
         #If the current string is an option, then set in_option and option_line (the line that initiates the option). Then adds the indent of the option to the list
         elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF') or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
@@ -669,14 +671,15 @@ for file, code in complete_code.items(): #Loop through each file
                 first_option = False
 
         #If the string starts with an * or is an option line, then evaluate          
-        if (no_space_string.startswith('*') or option_line == True):
+        if (no_space_string.startswith('*') or option_line == True or no_space_string.startswith('OPPOSED_PAIR')):
             if '*COMMENT' in no_space_string or '*RETURN' in no_space_string: #If it is a comment or return, then it can ignore indent rules
                 comment_return_line = True
-            elif '*IF' in no_space_string: #If it is an IF command, then we are now evaluating an IF command
+            elif '*IF' in no_space_string or '*ELSEIF' in no_space_string or '*ELSE' in no_space_string or '*STAT_CHART' in no_space_string or 'OPPOSED_PAIR' in no_space_string or '*ACHIEVEMENT' in no_space_string: #If it is an IF command, then we are now evaluating an IF command
                 in_if = True
-                if_indent = actual_indent
+                active_ifs += 1
+                if_indents.append(actual_indent)
             else: #Otherwise we can just say we're evaluating any other command line
-                current_command = True
+                 current_command = True
               
         else: #If none of the above, then it must be prose
             current_prose = True
@@ -708,8 +711,8 @@ for file, code in complete_code.items(): #Loop through each file
 
         #If this is an IF block and there is no IF in the string (i.e. it's not the originating IF command) then the indent has to be greater than the IF indent
         #This should actually be impossible to trigger because as soon as the actual indent is the same or less than, we turn off in_if
-        if in_if == True and '*IF' not in no_space_string and actual_indent <= if_indent:
-            file_invalid_indents.append([string, original_string[0], 'The contents of an if statement must have a greater indent than the if command', if_indent, actual_indent])
+        if in_if == True and ('*IF' not in no_space_string and '*ELSEIF' not in no_space_string and '*ELSE' not in no_space_string and '*STAT_CHART' not in no_space_string and 'OPPOSED_PAIR' not in no_space_string and '*ACHIEVEMENT' not in no_space_string) and actual_indent <= if_indents[active_ifs - 1]:
+             file_invalid_indents.append([string, original_string[0], 'The contents of an if statement must have a greater indent than the if command', if_indents[active_ifs - 1], actual_indent])
 
         #If the previous string was prose, then the following line must have the same indent. Unless it is calling a new option, or is a comment or return line                
         if previous_prose == True:
@@ -722,23 +725,8 @@ for file, code in complete_code.items(): #Loop through each file
 
 
     invalid_indents[file] = file_invalid_indents                          
-            
-#191 errors
-
-            
-#Handling nested IFs - in same way as choice and options
-    
-#Falling out of choices and ifs without a goto
-
-
-#Consistency - identify a base indent amount and evaluate against it
-#- choice blocks should all be equal
-#Something after an *if
-
-
 
 print ("Finished finding all lines of code that were improperly indented")
-time.sleep(0.25)
 ##################################################################################################################
 
 
@@ -787,17 +775,41 @@ for file, invalid_indents in invalid_indents.items():
 
 indent_output_df = pd.DataFrame(indent_output, columns = ['test', 'filename', 'string', 'row_number', 'error', 'expected_indent', 'actual_indent'])
 indent_output_df.to_csv('indent_output.csv')
+##################################################################################################################
+
+exit_command = input ("CS test has completed successfully. Press ENTER to exit.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 ## Future functionality
+
+#Falling out of choices and ifs without a goto
+
+
+#Consistency - identify a base indent amount and evaluate against it
+#- choice blocks should all be equal
+#Something after an *if
+
+
 # Spaces after a # when it denotes a choice - needs to catch
 # Missing * on a command
 # Misspelt command
-# Output as complete errors as possible, the command that failed and the stats at that time
-
-#indents - split into inconsistent, potentially invalid and invalid
-#test if the lock on indent length is only per indent (so rests once it hits 0)
 
 
 
