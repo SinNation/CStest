@@ -16,6 +16,7 @@ import pathlib
 #2) It assumes that no variable names use symbols that are commonly use in code (e.g. < !)
 #3) It assumed that a variable with an _ is used in an array and is therefore handled differently
 #4) Occurences of AND, OR, TRUE, FALSE are deemed to be part of the code and never variable names
+#5) If the code changes implicit control flow, it will be read in the order the files are read, not in the order the code actually runs
 ##################################################################################################################
 
 
@@ -32,6 +33,7 @@ timestamp = datetime.datetime.now()
 tests_path = os.getcwd() #Path of the folder containing CStest
 cs_projects_path_interim = os.path.dirname(os.getcwd()) #Parent path, should contain all CS project folders
 cs_projects_path = os.path.dirname(cs_projects_path_interim) #Parent path, should contain all CS project folders
+print (cs_projects_path)
 ##################################################################################################################
 
 
@@ -335,7 +337,7 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
 #Define our function to pull out variables from prose strings
 def find_variables_in_prose_strings (variables_in_file, string, bracket_variables_in_file, row_number):
     strings_to_remove_from_prose = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*', '[B]', '[I]', '[/B]', '[/I]',\
-                                    '/', '$', '@', ':', '.', ',', ';', '£', '"', '*page_break', '*line_break'] #Slightly different characters to strip from the string
+                                    '/', '$', '@', ':', '.', ',', ';', '£', '"', '*PAGE_BREAK', '*LINE_BREAK'] #Slightly different characters to strip from the string
     for string_to_remove in strings_to_remove_from_prose:
                 string = string.replace(string_to_remove,' ') #Loop through the characters and replace them.
     if '{' in string: #In prose, variables are called with {} - this identifies that the string contains a variable
@@ -390,6 +392,11 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
     for original_string in code:
 
         string = original_string[1] #Redefine our string as just the line of code, ignoring the row number
+
+        if 'IMPLICIT_CONTROL_FLOW' in string and file == 'startup.txt' and 'CREATE' in string and 'TRUE' in string:
+            file_icf = True
+        else:
+            file_icf = False
 
         #Remove AND, OR, TRUE and FALSE as there are frequently found in the code but are not variable names
         string = re.sub(r'\bAND\b'  , '', string) #Remove 'and' where it is a standalone word and not part of a longer word
@@ -551,18 +558,23 @@ print ("Finished finding all variables that were called but never defined")
         
 ##################################################################################################################
 #Parse the complete code to measure the indents on each line to spot cases where potentially the indent is incorrect
-#Dictionaries to store all the indent outcomes
-consistency_indents = {}
+#And spot code errors
+#And spot cases where the code falls out of options, else and elseif
+
+#Dictionaries to store all the errors
 invalid_indents = {}
+invalid_code = {}
 
-project_base_indent = 0 #To determine which indents are not consistent, this stores the 'base' indent increment for the project
-
+#Initialises variables we need with initial values
 previous_prose = False #Whether the previous line was prose
 previous_command = False #Whether the previous line was just a command
 current_prose = False #Whether the current line is prose
 current_command = False #Whether the current line is just a command
+option_string = '' #Value of the previous line in an option
+option_string_line = 0 #Row number of the previous line in an option
 
 in_choice = False #Whether a choice block is being evaluated
+fake_choice = False #Whether the choice block is a false one or not - for icf tracking
 in_option = False #Whether an option block is being evaluated
 previous_option_indent = 0 #The indent of the previous option block
 in_if = False #Whether an if block is being evaluated
@@ -570,26 +582,55 @@ in_if = False #Whether an if block is being evaluated
 
 
 for file, code in complete_code.items(): #Loop through each file
-    file_consistent_indents = [] #Lists to capture the invalid indents in the file
-    file_invalid_indents = [] 
-    file_potentially_invalid_indents = []
+    file_invalid_indents = []
+    file_invalid_code = []
 
     choice_indents = [] #List to hold all the indents of each active choice block
     active_choices = 0 #Total number of active choices being evaluated
     option_indents = [] #List to hold all the indents of each active option block
-    if_indents = []
-    active_ifs = 0
-    in_choice = False
+    if_indents = [] #List to hold all the idnents of each active if block
+    active_ifs = 0 #Total number of if blocks being evaluated
+    in_choice = False #Reset the flags for the new file
+    fake_choice = False
     in_option = False
     in_if = False
     expected_indent = 0 #First line will always be expected to have no indent
     previous_indent = 0 #File always starts without a previous indent
+    previous_option_string = '' #Reset the option string
+    previous_option_string_line = 0
     first_option = False #Whether this is the first option in the choice
 
     for original_string in code: #Loops through each string
         string = original_string[1] #Takes just the string, leaving the row number
         no_space_string = string.lstrip() #Strip the indent so we can check what the string actually starts with
 
+        #If the line starts with an asteriks and there is gap before the command
+        if no_space_string.startswith('* '):
+            file_invalid_code.append([string, original_string[0], 'The * is followed by a space, the command must follow the * without a space'])
+
+        #Valid commands to check they correctly have an asteriks before them
+        commands = ['IF', 'SET', 'ELSEIF', 'ELSE', 'INPUT_TEXT', 'INPUT_NUMBER', 'SELECTABLE_IF', 'PAGE_BREAK', 'LINE_BREAK', 'ALLOW_REUSE', 'DISABLE_REUSE', 'HIDE_REUSE', 'TEMP', 'CREATE', 'GOTO', 'GOSUB',\
+                    'FAKE_CHOICE', 'COMMENT', 'LABEL', 'CHOICE', 'RETURN', 'STAT_CHART', 'ACHIEVE', 'TEXT_IMAGE', 'FEEDBACK', 'PARAMS', 'ACHIEVEMENT', 'BUG', 'LINK', 'RAND', 'LOOPLIMIT', 'SUBSCRIBE', 'ENDING',\
+                    'FINISH', 'IMAGE', 'AUTHOR', 'SCENE_LIST', 'SAVE_GAME', 'TITLE']
+        #When assessing this, it will pickin up valid prose lines that start with some of the command string values. This list contains common words/punctuation in prose
+        #that should not appear in command lines - so we can filter out the prose lines using these
+        prose_strings = ["'", ',', ' YOU ', ' THE ', ' A ', ' TO ', ' OF ', ' WITH ']
+
+        #If any string starts with the command (no asteriks) and doesn't have any of our 'prose strings' in it - we assume it is a command missing the asteriks
+        if any(no_space_string.startswith(command) for command in commands) and not any (prose_string in no_space_string for prose_string in prose_strings):
+                file_invalid_code.append([string, original_string[0], 'The command is missing an asteriks (*)'])
+
+        #If we have an asteriks that isn't followed by any of our commands, we assume the command is mistyped
+        if no_space_string.startswith('*') and not any (no_space_string.startswith('*'+command) for command in commands):
+                file_invalid_code.append([string, original_string[0], 'The command following the asteriks(*) is not recognised'])
+
+        #If the string is setting implicit control flow in some way, we record it
+        if 'IMPLICIT_CONTROL_FLOW' in string and 'SET' in string:
+            if 'TRUE' in string:
+                file_icf = True
+            else:
+                file_icf = False
+            
         actual_indent = len(string) - len(string.lstrip(' ')) #The indent of the string
         current_prose = False #Resets the flags for the type of string it is
         current_command = False
@@ -598,6 +639,7 @@ for file, code in complete_code.items(): #Loop through each file
 
         for count in range (active_choices):
             if in_choice == True: #If currently evaluating a choice block
+
                 if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the choice command
                     choice_indents.pop(active_choices - 1) #Then this choice is finished, remove its indent
                     option_indents.pop(active_choices - 1) #And remove the option indent
@@ -611,6 +653,10 @@ for file, code in complete_code.items(): #Loop through each file
         #If it is evaluating an option and either the current line is a new choice, or the current line is an IF which is inside the choice and outside the current option
         #Then we are no longer in an option
         if in_option == True:
+
+            option_string = no_space_string #For checking falling out of options, we need to be able to check the last line of the option - this records it
+            option_string_line = original_string[0]
+            
             #A new option block
             if ((no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF')) or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
                  (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string)):
@@ -635,8 +681,13 @@ for file, code in complete_code.items(): #Loop through each file
                 if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 1] and actual_indent <= option_indents[active_choices - 1]:
                     in_option = False
                     previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
-            
 
+            if in_option == False and file_icf == False and fake_choice == False and not (previous_option_string.startswith('*GO') or previous_option_string.startswith('*FINISH') or previous_option_string.startswith('*ENDING')):
+                file_invalid_code.append([previous_option_string, previous_option_string_line, 'When implicit_control_flow is FALSE you must end every option block with a GOTO, ENDING or FINISH'])
+                previous_option_string = False
+                previous_option_string_line = 0
+                fake_choice = False
+            
         #If it is evaluating an IF and the indent of this line is less than or equal to the IF command, then no longer in an IF
         for count in range (active_ifs):
             if in_if == True and actual_indent <= if_indents[active_ifs - 1]:
@@ -655,12 +706,23 @@ for file, code in complete_code.items(): #Loop through each file
             choice_indents.append (actual_indent)
             previous_prose = False
 
+            #For checking if the code falls out of a choice, this tells us if fake choice was used, so we can say icf is true for this true
+            if no_space_string.startswith('*FAKE_CHOICE'):
+                fake_choice = True
+
         #If the current string is an option, then set in_option and option_line (the line that initiates the option). Then adds the indent of the option to the list
         elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF') or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
              (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string):
             in_option = True
             option_line = True
-            if len(option_indents) == active_choices: #Each option in a choice must have the same or lower indent than the previous option. If this is the first option for the choice
+
+            #If there are no active choices, then there should be no options.
+            if active_choices == 0:
+                file_invalid_code.append([string, original_string[0], 'Choice option (#) is not contained within a *choice block'])
+                in_option = False
+                option_line = False
+
+            elif len(option_indents) == active_choices: #Each option in a choice must have the same or lower indent than the previous option. If this is the first option for the choice
                 option_indents[active_choices - 1] = actual_indent #Then add it to the list of option indents
 
             else: #Otherwise it is a subsequent option, setting the new requirement for the maximum indent of the next option. So overwrite the indent value for this choice block
@@ -723,9 +785,12 @@ for file, code in complete_code.items(): #Loop through each file
         #Store the previous values
         previous_prose = current_prose
         previous_indent = actual_indent
+        previous_option_string = option_string
+        previous_option_string_line = option_string_line
 
 
-    invalid_indents[file] = file_invalid_indents                          
+    invalid_indents[file] = file_invalid_indents
+    invalid_code[file] = file_invalid_code
 
 print ("Finished finding all lines of code that were improperly indented")
 ##################################################################################################################
@@ -734,6 +799,17 @@ print ("Finished finding all lines of code that were improperly indented")
 
 ##################################################################################################################
 #Output all the test outcomes into a single file
+
+critical_bugs_output = []
+
+#invalid_code
+for file, invalid_codes in invalid_code.items():
+    for invalid_code in invalid_codes:
+        critical_bugs_output.append(['Invalid line of code', file, invalid_code[0], invalid_code[1], invalid_code[2]])
+
+critical_bugs_output_df = pd.DataFrame(critical_bugs_output, columns = ['test', 'filename', 'line_of_code', 'row_number', 'error_details'])
+os.chdir(test_run_path)
+critical_bugs_output_df.to_csv('critical_bugs_output.csv')
 
 variable_output = []
 
@@ -762,9 +838,9 @@ for file, bracket_variables_called_before_defined in bracket_variables_called_be
     for bracket_variable_called_before_defined in bracket_variables_called_before_defined:
         variable_output.append(['variable called before defined', file, bracket_variable_called_before_defined[0], bracket_variable_called_before_defined[1]])
 
-output_df = pd.DataFrame(variable_output, columns = ['test', 'filename', 'variable_name', 'row_number'])
+variable_output_df = pd.DataFrame(variable_output, columns = ['test', 'filename', 'variable_name', 'row_number'])
 os.chdir(test_run_path)
-output_df.to_csv('variable_output.csv')
+variable_output_df.to_csv('variable_output.csv')
 
 
 indent_output = []
@@ -774,33 +850,21 @@ for file, invalid_indents in invalid_indents.items():
     for invalid_indent in invalid_indents:
         indent_output.append(['invalid_indent', file, invalid_indent[0], invalid_indent[1], invalid_indent[2], invalid_indent[3], invalid_indent[4]])
 
-indent_output_df = pd.DataFrame(indent_output, columns = ['test', 'filename', 'string', 'row_number', 'error', 'expected_indent', 'actual_indent'])
+indent_output_df = pd.DataFrame(indent_output, columns = ['test', 'filename', 'string', 'row_number', 'error_details', 'expected_indent', 'actual_indent'])
 indent_output_df.to_csv('indent_output.csv')
 ##################################################################################################################
+
+
+#Print errors, critical first - or point to folder
 
 exit_command = input ("CS test has completed successfully. Press ENTER to exit.")
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Future functionality
 
-#Falling out of choices and ifs without a goto
+#Falling out of ELSE and ELSEIF without goto
 
 
 #Consistency - identify a base indent amount and evaluate against it
@@ -808,9 +872,7 @@ exit_command = input ("CS test has completed successfully. Press ENTER to exit."
 #Something after an *if
 
 
-# Spaces after a # when it denotes a choice - needs to catch
-# Missing * on a command
-# Misspelt command
+
 
 
 
