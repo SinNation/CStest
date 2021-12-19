@@ -1,4 +1,4 @@
- ##################################################################################################################
+##################################################################################################################
 import os
 import re
 import time
@@ -161,61 +161,61 @@ for file in list_of_files: #Uses the list of files to allow us to cycle through 
 
 
 
+##################################################################################################################
 print ("Project folder: " + project_folder + " has been found.\n")
 print (str(number_of_files) + ".txt files have been found in project folder: " + project_folder + "\n")
 print ("Outcome of tests will be stored in: " + test_run_path + "\n")
 print ("Finished creating the code for all " + str(number_of_files) + ".txt files in the directory.\n")
+##################################################################################################################
 
-    
+
+
 
 ##################################################################################################################
-# Parse the code to pull out all the cases where variables are defined and build a dictionary containing every variable in the game and the file it is defined in. 
+#Define our function for pulling out the definition of variables in the code
+def find_defined_variables (string, string_row, command, list_of_variables, list_of_duplicate_variables):
+    if command in string: #If the command (create or temp) is in the string, then it denotes the creation of a variable
+        variable = string[string.find(command)+len(command):].split()[0] #Split that string to just take the first word after the create command (chopping off the command and the initial value
+        if variable in list_of_variables or variable in duplicate_variables.values(): #If the resulting variable already exists in our list, don't add it and instead identify it as a duplicate
+            list_of_duplicate_variables.append ([string_row, variable])
+        else:
+            list_of_variables.append ([string_row, variable]) #Append to our list, taking the row number from the original string
+    return list_of_variables, list_of_duplicate_variables
+##################################################################################################################
 
-list_of_variables = [] #List to contain all the created variables, to be populated into the dictionary
+
+
+##################################################################################################################
+# Parse the code to pull out all the cases where variables are defined and build a dictionary containing every variable in the game and the file it is defined in.
 created_variables = {} #Dictionary to hold all the variables created in the game and the file in which they are created
-list_of_duplicate_variables = [] #Variables that are created more than once in the startup file
-duplicate_variables = {}
+duplicate_variables = {} #Dictionary to hold all the duplicate variables created in the game and the file in which they are created
 
+for file, code in complete_code.items(): #Loop through each file in turn
+    if file == 'startup.txt': #If the file is the startup, then CREATE is a valid command
+        commands = ['*CREATE', '*TEMP']
+    else:
+        commands = ['*TEMP'] #Else it is just TEMP which is valid
+    
+    list_of_variables = [] #A list to hold all the variables defined in the file which is recreated for each file
+    list_of_duplicate_variables = [] #List to hold all the duplicate files defined in the file
+    
+    for original_string in code: #Take each line of code from the file
+        string = original_string[1] #Split it into the actual code
+        string_row = original_string[0] #And the row number
 
-for original_string in complete_code['startup.txt']: #Take all the lines of code in the startup file. This gives us a list for each string (the row number and the code)
-    string = original_string[1] #So take just the code and pass that in as our string
-    if '*CREATE' in string: #If there is a *create command in our string, then it denotes the creation of a variable
-        variable = string[string.find('*CREATE')+len('*CREATE'):].split()[0] #Split that string to just take the first word after the create command (chopping off the command and the initial value
-        if variable in list_of_variables: #If the resulting variable already exists in our list, don't add it and instead identify it as a duplicate
-            list_of_duplicate_variables.append ([original_string[0], variable])
+        for command in commands: #Loop through the valid commands
+            list_of_variables, list_of_duplicate_variables = find_defined_variables (string, string_row, command, list_of_variables, list_of_duplicate_variables)
+
+        #Whilst looping around all the code we can set the base icf value, if it is set to true in the startup
+        if 'IMPLICIT_CONTROL_FLOW' in string and file == 'startup.txt' and 'CREATE' in string and 'TRUE' in string:
+            file_icf = True
         else:
-            list_of_variables.append ([original_string[0], variable]) #Append to our list, taking the row number from the original string
+            file_icf = False
+            
+    created_variables[file] = list_of_variables # Add the list of variables as a value in the dictionary with the key being the file name
 
-    if '*TEMP' in string: #If there is a *temp command in our string, then it denotes the creation of a variable
-        variable = string[string.find('*TEMP')+len('*TEMP'):].split()[0] #Split that string to just take the first word after the temp command (chopping off the command and the initial value
-        if variable in list_of_variables: #If the resulting variable already exists in our list, don't add it and instead identify it as a duplicate
-            list_of_duplicate_variables.append ([original_string[0], variable])
-        else:
-            list_of_variables.append ([original_string[0], variable]) #Append to our list, taking the row number from the original string
-
-created_variables['startup.txt'] = list_of_variables #Add the list of variables as a value in the dictionary with the key being the startup.txt file name
-
-if list_of_duplicate_variables:
-    duplicate_variables['startup.txt'] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
-
-
-for file, code in complete_code.items(): #Now loop through all the files to look for temp variables in the remainder of the code. We want to bypass the startup file as we have already handled it
-    if file != 'startup.txt': #Only process the file if it isn't the startup
-        list_of_variables = [] #Reset the list of variables, so it is calculated fresh for each file
-        list_of_duplicate_variables = [] #Reset the list of duplicate variables, so it is calculated fresh for each file
-        for original_string in code: #Follow the same pattern as above
-            string = original_string[1]
-            if '*TEMP' in string:
-                variable = string[string.find('*TEMP')+len('*TEMP'):].split()[0]
-                if variable in list_of_variables:
-                    list_of_duplicate_variables.append ([original_string[0], variable])
-                #The difference here is that we want to append to the dictionary at the end of each file, so that we store the variables by file
-                else:
-                    list_of_variables.append ([original_string[0], variable]) # Create a list of all variable names in the file which follow the *temp command
-        created_variables[file] = list_of_variables # Add the list of variables as a value in the dictionary with the key being the file name
-
-        if list_of_duplicate_variables:
-            duplicate_variables[file] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
+    if list_of_duplicate_variables:
+        duplicate_variables[file] = list_of_duplicate_variables #Add the list of duplicate variables as a value in the dictionary with the key being the startup.txt file name
 
 print ("Identified all created and temp variable names in codebase\
        \n")
@@ -223,8 +223,23 @@ print ("Identified all created and temp variable names in codebase\
 
 
 
-#Parse the code to pull out all the variables referenced in the code and store a list, by file, of every single one.
-##################################################################################################################          
+##################################################################################################################
+#Define functions for pulling out all the variables called in the code
+
+def variable_check_prepare_string (string):
+    #Remove AND, OR, TRUE and FALSE as there are frequently found in the code but are not variable names
+    string = re.sub(r'\bAND\b'  , '', string) #Remove 'and' where it is a standalone word and not part of a longer word
+    string = re.sub(r'\bOR\b'   , '', string) #Remove 'or' where it is a standalone word and not part of a longer word
+    string = re.sub(r'\bTRUE\b' , '', string) #Remove 'true' where it is a standalone word and not part of a longer word
+    string = re.sub(r'\bFALSE\b', '', string) #Remove 'false' where it is a standalone word and not part of a longer word
+    string = re.sub(r'\bNOT\b'  , '', string) #Remove 'not' where it is a standalone word and not part of a longer word
+        
+    #Strip all the white space at the start of the string, allows us to correctly evaluate the first character of the string
+    string = string.lstrip()
+    return string
+
+##################################################################################################################
+
 # Define our function for pulling out variable names from command strings
 def find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, row_number):
     words_to_remove = [] #A list we are going to populate to hold all the strings that are not variables and need removing
@@ -233,9 +248,9 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
     bracket_variables_in_string = [] #A list to hold all the variables utilising [] in their names to be handled separately
 
     strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF', '*ALLOW_REUSE', '*DISABLE_REUSE', '*HIDE_REUSE', '*ELSE'\
-                                       , '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT('] #All valid characters that need to be cleaned out of strings
+                                       , '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT('] #All valid string that need to be cleaned out of strings
     for string_to_remove in strings_to_remove_from_commands:
-        string = string.replace(string_to_remove,' ') #Remove the characters so that we are, as best as possible, just left with variable names.
+        string = string.replace(string_to_remove,' ') #Remove the string so that we are, as best as possible, just left with variable names.
 
     # Split the remaining string down into individual words. We need to evaluate each word independently now.
     variables_in_string = string.split() #This is a our baseline for all the variables in the string - we will remove/add as required
@@ -329,17 +344,16 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
 
     #End function by returning the two file level lists which were passed in initially, now updated for the current string.
     return variables_in_file, bracket_variables_in_file
-##################################################################################################################
-
-
 
 ##################################################################################################################
+
 #Define our function to pull out variables from prose strings
 def find_variables_in_prose_strings (variables_in_file, string, bracket_variables_in_file, row_number):
     strings_to_remove_from_prose = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*', '[B]', '[I]', '[/B]', '[/I]',\
-                                    '/', '$', '@', ':', '.', ',', ';', '£', '"', '*PAGE_BREAK', '*LINE_BREAK'] #Slightly different characters to strip from the string
+                                    '/', '$', '@', ':', '.', ',', ';', '£', '"', '*PAGE_BREAK', '*LINE_BREAK'] #Slightly different strings to strip from the prose string
     for string_to_remove in strings_to_remove_from_prose:
-                string = string.replace(string_to_remove,' ') #Loop through the characters and replace them.
+                string = string.replace(string_to_remove,' ') #Loop through the strings and replace them.
+                     
     if '{' in string: #In prose, variables are called with {} - this identifies that the string contains a variable
         words_in_string = string.split() #Split the string into its component words
         for word in words_in_string: #Loop through each word
@@ -373,7 +387,7 @@ def find_variables_in_prose_strings (variables_in_file, string, bracket_variable
 
 
 ##################################################################################################################
-#Code which calls our two functions to identify all the variables in each file which have been called
+#Parse the code to pull out all the variables referenced in the code and store a list, by file, of every single one.
 
 #Dictionaries to store the variables in each file
 called_variables = {}
@@ -383,7 +397,7 @@ called_bracket_variables = {}
 #Those sub lists each contain a row number and the line of code found on that row number.
 #We want to take each line of code and parse it for the variables it calls.
 
-for file, code in complete_code.items(): #Gives us the entire list of lists containing all the code in each file
+for file, code in complete_code.items(): #Gives us the entire list of lists containing all the code in each file      
     
     variables_in_file = [] #Creates our master list to store all the variables called in the file. We will pass this in and out of the functions
     bracket_variables_in_file = [] #Creates our master list to store all the bracket variables called in the file. We will pass this in and out of the functions
@@ -391,24 +405,9 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
     #The code contains a number of lists in it, each list is a line of code and a row number. Loop through each of these
     for original_string in code:
 
-        string = original_string[1] #Redefine our string as just the line of code, ignoring the row number
+        string = variable_check_prepare_string (original_string[1]) #Redefine our string as just the line of code, ignoring the row number and cleanse it
 
-        if 'IMPLICIT_CONTROL_FLOW' in string and file == 'startup.txt' and 'CREATE' in string and 'TRUE' in string:
-            file_icf = True
-        else:
-            file_icf = False
-
-        #Remove AND, OR, TRUE and FALSE as there are frequently found in the code but are not variable names
-        string = re.sub(r'\bAND\b'  , '', string) #Remove 'and' where it is a standalone word and not part of a longer word
-        string = re.sub(r'\bOR\b'   , '', string) #Remove 'or' where it is a standalone word and not part of a longer word
-        string = re.sub(r'\bTRUE\b' , '', string) #Remove 'true' where it is a standalone word and not part of a longer word
-        string = re.sub(r'\bFALSE\b', '', string) #Remove 'false' where it is a standalone word and not part of a longer word
-        string = re.sub(r'\bNOT\b'  , '', string) #Remove 'not' where it is a standalone word and not part of a longer word
-        
-        #Strip all the white space at the start of the string, allows us to correctly evaluate the first character of the string
-        string = string.lstrip()
-
-        #Identify if the a command string and if so, pass to the command function
+        #Identify if the string is a command string and if so pass to the command function
         if (string.startswith('*IF') or string.startswith('*SET') or string.startswith('*ELSEIF') or string.startswith('*ELSE') or string.startswith('*INPUT_TEXT') or string.startswith('*INPUT_NUMBER')):
              variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, original_string[0]) #Pass in the cleansed string and the original row number
 
@@ -420,6 +419,69 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
 
             variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, command_string, bracket_variables_in_file, original_string[0])
             variables_in_file, bracket_variables_in_file = find_variables_in_prose_strings (variables_in_file, prose_string, bracket_variables_in_file, original_string[0])
+
+
+        #If there is an @{ in the string then it denotes that there is a multi-replace within the string somewhere. This is a bit more complicated for 3 reasons:
+        #1) The multi-replace can occur at any point in the string
+        #2) There can be more than one multi-replace in a string
+        #3) There is no universal marker to identify where the command element of the multi-replace ends and the prose begins
+        #We first check if there is an @, but then have to specifically check for the two possible occurences of multi-replace syntax
+        elif '@' in string:
+            if '@{' in string:
+                #Split the string on the first occurence of the '@' symbol. So any pre-prose is cut off. The '1' means it retains anything after the @
+                #Even if there are more @ symbols in the remaining string
+                string = string.split('@', 1)[1] #We take the 2nd element of the split (everything after the multi-replace)
+
+            if '@ {' in string:
+                string = string.split('@', 1)[1]
+
+            #If there are more than one multi-replace commands in the string, we can repeat this split to only take the first of them for now.
+            #The split above chops off the @ from the first multi-replace, meaning that any other @ found denotes a second multi-replace
+            if '@{' in string:
+                #We do the same process as above, to account for a potential space between the @ and {
+                multi_replace_string = string.split('@{', 1)[0] #We take the first elementy of the split (everything before the second multi-repalce)
+
+            if '@{' in string:
+                #We do the same process as above, to account for a potential space between the @ and {
+                multi_replace_string = string.split('@ {', 1)[0]
+             
+             
+
+
+
+             #Need to cut off any pre-prose
+             #Find how many brackets in the command
+             #Split out the command
+             #Split out the prose from the remaining prose
+             #Find any more multi-replaces
+             
+
+
+
+            #Get to the firtst word, if no ( then take first word
+             #Else count ) and stop after final closing bracket
+             
+
+
+    # @ is always followed by a { - denotes the calling of a variable
+    # ( then follows the { to denote either the calling of multiple variables or where a condition is given
+    # A ( denotes 
+    # The first word is always the variable name
+
+     @{(bailey_available or tommy_available) ${lopez},|${lopez} and}
+     @{tommy_available Bailey,|Bailey and}
+     @{(((bailey_available and not(tommy_available)) or (not(bailey_available) and tommy_available))) ${lopez} and|${lopez},}
+      @{(honor >= 50)
+      @{((main_ro = "Tommy") or (second_ro = "Tommy")) Every once in a while, you catch him looking over at you with a slight smile on his face, but he always breaks eye contact the moment you make it.|He wears a look of hardened
+        determination. His brow has sunken, his eyes have narrowed, his jaw has locked in a scowl, and his shoulders have tensed and curled up beside his head, making him look almost like a hunchback.}
+        You figure @{(ideal >= 50) his mood will improve once the rain subsides.|the weather is slowly crushing his mood.}
+        
+     @{(junkyard_battle_killed > 0) them,|it,} and I gotta say he did a great job. Kid's talented. I'm glad we picked that spot on the other side of the western wall as the cemetery. It will keep the @{(junkyard_battle_killed > 0) graves|grave}
+
+
+
+
+
 
         #Otherwise it must be a prose string, so pass it to the prose function
         else:
@@ -437,37 +499,43 @@ print ("Finished finding all variables called in all files.")
 
 
 
+##################################################################################################################                                                                         
+def variable_check_variables_not_called (mode, created_variable, variable_found, called_variables, created_file):
+    for called_file, called_variable_row in called_variables.items(): #Loop through all the files to find if the variable is called in it
+            if created_file == 'startup.txt' or called_file == created_file: #Only compare variables defined in the startup (which can be called anywhere), or variables defined in the SAME file we're checking (for temp variables)         
+                if variable_found == False: #If we haven't already found it
+                    for called_variable in called_variable_row: #Loop through all the called variables in the file
+                        if variable_found == False: #If we haven't already found it
+                            #If the variable we are currently comparing matches the one we are searching for. Here we take the second element of the list, as the first element is the row number
+                            if (mode == 'normal' and created_variable[1] == called_variable[1]) or (mode == 'bracket' and created_variable[1].split('_')[0] == called_variable[1].split('[')[0]):
+                                variable_found = True #Then set it to 'found'
+
+    return variable_found
+##################################################################################################################
+
+
 ##################################################################################################################
 #Check for whether there are any created variables that are not called in the code.
 
 variables_not_called = {}
+bracket_variables_not_called = {}
 
 for created_file, created_variable_row in created_variables.items(): #Loop through all the files
     variables_not_called_in_file = []
     for created_variable in created_variable_row: #Loop through all the variables created in the file
         variable_found = False #Set the variable as 'not found' to begin with.
-        
-        for called_file, called_variable_row in called_variables.items(): #Loop through all the files to find if the variable is called in it
-            if created_file == 'startup.txt' or called_file == created_file: #Only compare variables defined in the startup (which can be called anywhere), or variables defined in the SAME file we're checking (for temp variables)         
-                if variable_found == False: #If we haven't already found it
-                    for called_variable in called_variable_row: #Loop through all the called variables in the file
-                        if variable_found == False: #If we haven't already found it
-                            if created_variable[1] == called_variable[1]: #And the variable we are currently comparing matches the one we are searching for. Here we take the second element of the list, as the first element is the row number
-                                variable_found = True #Then set it to 'found'
+    
+        variable_found = variable_check_variables_not_called ('normal', created_variable, variable_found, called_variables, created_file)
 
-        for called_bracket_file, called_bracket_variable_row in called_bracket_variables.items(): #Repeat for the bracket variables
-            if created_file == 'startup.txt' or called_bracket_file == created_file:
-                if variable_found == False: #If we haven't already found it
-                    for called_bracket_variable in called_bracket_variable_row:
-                        if variable_found == False:
-                            if created_variable[1].split('_')[0] == called_bracket_variable[1].split('[')[0]: #Difference here is we split the variables before the _ and brackets and simply match on the stub rather than the full variable name
-                                variable_found == True
+        if variable_found == False:
+            variable_found = variable_check_variables_not_called ('bracket', created_variable, variable_found, called_bracket_variables, created_file)
 
         if variable_found == False: #After looking for the variable in every file and not finding it, add it as a non-called variable             
             variables_not_called_in_file.append([created_variable[1], created_variable[0]])
 
-    if variables_not_called:
-        variables_not_called[file] = variables_not_called
+    if variables_not_called_in_file:
+        variables_not_called[created_file] = variables_not_called_in_file
+
 
 print ("Finished finding all variables that were defined but never called")
 ##################################################################################################################
@@ -477,6 +545,29 @@ print ("Finished finding all variables that were defined but never called")
 ##################################################################################################################
 #Check for any called variables which are not defined in the startup or are not defined in the same file (temp)
 #Also, where it is a temp variable, it also checks if it was defined on a later row number than the one it was called on
+def variable_check_variables_not_defined (mode, called_variable, variables_defined_in_startup, created_variables, variable_defined):
+                   
+    for created_file, created_variable_row in created_variables.items(): #Loop through each file
+        row_defined_on = 0
+        if created_file == 'startup.txt' or called_file == created_file: #If the file is startup or the same file we are checking, then proceed (we don't want to check temp variables in other files)
+            if variable_defined == False: #If we haven't already found it
+                for created_variable in created_variable_row: #Loop through each created variable in that file
+                    if variable_defined == False: #If we haven't se the variable to defined yet
+                        if (mode == 'normal' and called_variable[1] == created_variable[1]) or (mode == 'bracket' and called_variable[1].split('[')[0] == created_variable[1].split('_')[0]): #Then check if the variable we are checking matches the one we are searching for
+                            variable_defined = True #And if so, set it to 'defined'
+                            if created_file != 'startup.txt':
+                                row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
+                            if created_file == 'startup.txt':
+                                if mode == 'normal':
+                                    variables_defined_in_startup.append(called_variable[1]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
+                                if mode == 'bracket':
+                                    variables_defined_in_startup.append(called_variable[1].split('[')[0]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
+                
+    return variables_defined_in_startup, variable_defined, row_defined_on
+
+
+##################################################################################################################
+
 variables_not_defined = {}
 variables_called_before_defined = {}
 variables_defined_in_startup = []
@@ -485,76 +576,33 @@ for called_file, called_variable_row in called_variables.items(): #Loop through 
     variables_not_defined_in_project = []
     variables_called_before_defined_in_project = []
     for called_variable in called_variable_row: #Loop through each called variable in the file
-        if called_variable[1] not in variables_defined_in_startup: #If the variable name is in our list (generated in these loops), then we already know it has been defined and can be skipped
+
+        if called_variable[1] not in variables_defined_in_startup: #If the variable name is in our list (generated in these loops), then we already know it has been defined and can be skipped       
             variable_defined = False #Set variable as not defined, until we see that it is
-            
-            for created_file, created_variable_row in created_variables.items(): #Loop through each file     
-                if created_file == 'startup.txt' or called_file == created_file: #If the file is startup or the same file we are checking, then proceed (we don't want to check temp variables in other files)
-                    if variable_defined == False: #If we haven't already found it
-                        for created_variable in created_variable_row: #Loop through each created variable in that file
-                            if variable_defined == False: #If we haven't se the variable to defined yet
-                                if called_variable[1] == created_variable[1]: #Then check if the variable we are checking matches the one we are searching for
-                                    variable_defined = True #And if so, set it to 'defined'
-                                    row_defined_on = 0
-                                    if created_file != 'startup.txt':
-                                        row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
-                                    if created_file == 'startup.txt':
-                                        variables_defined_in_startup.append(called_variable[1]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
-          
+     
+            variables_defined_in_startup, variable_defined, row_defined_on = variable_check_variables_not_defined ('normal', called_variable, variables_defined_in_startup, created_variables, variable_defined)
+
+            if variable_defined == False:
+                if called_file in called_bracket_variables.keys():
+                    for called_bracket_variable in called_bracket_variables[called_file]:
+                        if called_bracket_variable[1].split('[')[0] not in variables_defined_in_startup:
+                            variables_defined_in_startup, variable_defined, row_defined_on = variable_check_variables_not_defined ('bracket', called_bracket_variable[1], variables_defined_in_startup, created_variables, variable_defined)
+
+
             if variable_defined == False: #If we get through all the files and we never find the variable, add it as a non-defined variable
                 variables_not_defined_in_project.append([called_variable[1], called_variable[0]])
             else:
                 if called_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
                     variables_called_before_defined_in_project.append ([called_variable[1], called_variable[0], row_defined_on])
-
+            
     if variables_not_defined_in_project:
-        variables_not_defined[file] = variables_not_defined_in_project
+        variables_not_defined[called_file] = variables_not_defined_in_project
 
     if variables_called_before_defined_in_project:
-        variables_called_before_defined[file] = variables_called_before_defined_in_project
-                
+        variables_called_before_defined[called_file] = variables_called_before_defined_in_project
 
-#Repeat for the bracket variables. The main difference here is we just match on the stub of the variable name before the _ or [.
-#This just means we don't match the exact variable name, but there is nothing to be done about that.
-
-bracket_variables_not_defined = {}
-bracket_variables_called_before_defined = {}
-    
-for called_bracket_file, called_bracket_variable_row in called_bracket_variables.items():
-    bracket_variables_not_defined_in_project = []
-    bracket_variables_called_before_defined_in_project = []
-    for called_bracket_variable in called_bracket_variable_row:
-        if called_variable[1].split('[')[0] not in variables_defined_in_startup:
-            variable_defined = False
-            for created_file, created_variable_row in created_variables.items():
-                if created_file == 'startup.txt' or called_bracket_file == created_file:
-                    if variable_defined == False: #If we haven't already found it
-                        for created_variable in created_variable_row:
-                            if variable_defined == False:
-                                if called_bracket_variable[1].split('[')[0] == created_variable[1].split('_')[0]:
-                                    variable_defined = True
-                                    row_defined_on = 0
-                                    if created_file != 'startup.txt':
-                                        row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
-                                    if created_file == 'startup.txt':
-                                        variables_defined_in_startup.append(called_bracket_variable[1].split('[')[0]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
-                            
-        if variable_defined == False:
-            bracket_variables_not_defined_in_project.append([called_bracket_file, called_bracket_variable[1], called_bracket_variable[0]])
-        else:
-            if called_bracket_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
-                bracket_variables_called_before_defined_in_project.append ([called_bracket_variable[1], called_bracket_variable[0], row_defined_on])
-
-    if bracket_variables_not_defined_in_project:
-        bracket_variables_not_defined[file] = bracket_variables_not_defined_in_project
-
-    if bracket_variables_called_before_defined_in_project:
-        bracket_variables_called_before_defined[file] = bracket_variables_called_before_defined_in_project
 
 print ("Finished finding all variables that were called but never defined")
-##################################################################################################################
-
-
         
 ##################################################################################################################
 #Parse the complete code to measure the indents on each line to spot cases where potentially the indent is incorrect
@@ -825,18 +873,10 @@ for file, variables_not_called in variables_not_called.items():
 for file, variables_not_defined in variables_not_defined.items():
     for variable_not_defined in variables_not_defined:
         variable_output.append(['variable not defined', file, variable_not_defined[0], variable_not_defined[1]])
-#bracket variables not defined
-for file, bracket_variables_not_defined in bracket_variables_not_defined.items():
-    for bracket_variable_not_defined in bracket_variables_not_defined:
-        variable_output.append(['variable not defined', file, bracket_variable_not_defined[0], bracket_variable_not_defined[1]])
 #variables called before defined
 for file, variables_called_before_defined in variables_called_before_defined.items():
     for variable_called_before_defined in variables_called_before_defined:
         variable_output.append(['variable called before defined', file, variable_called_before_defined[0], variable_called_before_defined[1]])
-#bracket variables called before defined
-for file, bracket_variables_called_before_defined in bracket_variables_called_before_defined.items():
-    for bracket_variable_called_before_defined in bracket_variables_called_before_defined:
-        variable_output.append(['variable called before defined', file, bracket_variable_called_before_defined[0], bracket_variable_called_before_defined[1]])
 
 variable_output_df = pd.DataFrame(variable_output, columns = ['test', 'filename', 'variable_name', 'row_number'])
 os.chdir(test_run_path)
