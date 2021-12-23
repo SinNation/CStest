@@ -12,7 +12,7 @@ import pathlib
 ##################################################################################################################
 #Assumptions:
 #CS tests makes some assumptions about the structure of the game code it is testing.
-#1) It assumes that temporary variables are declared on an earlier row than they care called
+#1) It assumes that temporary variables are declared on an earlier row than they are called
 #2) It assumes that no variable names use symbols that are commonly use in code (e.g. < !)
 #3) It assumed that a variable with an _ is used in an array and is therefore handled differently
 #4) Occurences of AND, OR, TRUE, FALSE are deemed to be part of the code and never variable names
@@ -33,16 +33,16 @@ timestamp = datetime.datetime.now()
 tests_path = os.getcwd() #Path of the folder containing CStest
 cs_projects_path_interim = os.path.dirname(os.getcwd()) #Parent path, should contain all CS project folders
 cs_projects_path = os.path.dirname(cs_projects_path_interim) #Parent path, should contain all CS project folders
-print (cs_projects_path)
 ##################################################################################################################
 
 
 
 ##################################################################################################################
 print("=================================================================\
-     \nWelcome to CStest. A python based testing engine for Choicescript.\
-     \nThis script should be stored in a folder alongside your CS projects.\
-     \nInput the name of the folder of the project you wish to test.\
+     \nWelcome to CStest.\
+     \nThis tool will parse your entire Choicescrip project and report bugs.\
+     \nEnsure the CStest folder is stored alongside your CS projects.\
+     \nInput the name of the folder of the project you wish to test below.\
      \n\
      \nA test outcome folder for the CS project will be generated.\
      \nThis folder is stored within the main CStest folder.\
@@ -82,7 +82,7 @@ while correct_folder == False:
 list_of_files = [] #Empty list to append all the file names to
 for file in os.listdir(project_path):
     if file.endswith('.txt'): #Loops through all the files with a .txt extension
-       list_of_files.append(file)
+       list_of_files.append(file) #Appends each file to the list
 number_of_files = len(list_of_files)
 ##################################################################################################################
 
@@ -116,7 +116,7 @@ complete_code = {} #Dictionary to hold all the code in the game
 for file in list_of_files: #Uses the list of files to allow us to cycle through all the files in the project
     file_path = project_path + '\\' + file #Constructs the file path for the specific file
     try:
-        with open(file_path, encoding = 'utf-8') as cs_file:
+        with open(file_path, encoding = 'utf-8') as cs_file: #Encoding handles some (not all) mis-read characters
             code = cs_file.readlines() #Reads each line of the file in as a list of strings
     except:
         print ("******************************************************************************************\
@@ -156,7 +156,7 @@ for file in list_of_files: #Uses the list of files to allow us to cycle through 
               \n")
         input("Press ENTER to exit")
     
-    complete_code[file] = numbered_code # Add the code for each file as a list of strings to the dictionary. The key is the file name
+    complete_code[file] = numbered_code #Add the code for each file as a list of strings to the dictionary. The key is the file name
 ##################################################################################################################
 
 
@@ -170,7 +170,6 @@ print ("Finished creating the code for all " + str(number_of_files) + ".txt file
 
 
 
-
 ##################################################################################################################
 #Define our function for pulling out the definition of variables in the code
 def find_defined_variables (string, string_row, command, list_of_variables, list_of_duplicate_variables):
@@ -179,11 +178,21 @@ def find_defined_variables (string, string_row, command, list_of_variables, list
         if variable in list_of_variables or variable in duplicate_variables.values(): #If the resulting variable already exists in our list, don't add it and instead identify it as a duplicate
             list_of_duplicate_variables.append ([string_row, variable])
         else:
-            list_of_variables.append ([string_row, variable]) #Append to our list, taking the row number from the original string
+            list_of_variables.append ([string_row, variable]) #Otherwise, it is a new variable, so append to our list, taking the row number from the original string
     return list_of_variables, list_of_duplicate_variables
 ##################################################################################################################
 
+##################################################################################################################
+#Define our function for pulling out the definition of parameter variables in the code
+def find_param_variables (string, string_row, list_of_variables):
+    string = string.split('*PARAMS')[1] #Remove '*PARAMS' from the string
+    variables = string.split() #Then split each word into its own string. Each word after the *params command is a 'variable'
 
+    for variable in variables:
+        if variable not in list_of_variables: #Loop through each variable, as long as it hasn't already been identified
+            list_of_variables.append ([string_row, variable]) #Append to our list, taking the row number from the original string
+    return list_of_variables
+##################################################################################################################
 
 ##################################################################################################################
 # Parse the code to pull out all the cases where variables are defined and build a dictionary containing every variable in the game and the file it is defined in.
@@ -206,6 +215,9 @@ for file, code in complete_code.items(): #Loop through each file in turn
         for command in commands: #Loop through the valid commands
             list_of_variables, list_of_duplicate_variables = find_defined_variables (string, string_row, command, list_of_variables, list_of_duplicate_variables)
 
+        if string.startswith('*PARAMS'): #If the string is a param command, then we parse it here
+            list_of_variables = find_param_variables (string, string_row, list_of_variables)
+
         #Whilst looping around all the code we can set the base icf value, if it is set to true in the startup
         if 'IMPLICIT_CONTROL_FLOW' in string and file == 'startup.txt' and 'CREATE' in string and 'TRUE' in string:
             file_icf = True
@@ -224,7 +236,7 @@ print ("Identified all created and temp variable names in codebase\
 
 
 ##################################################################################################################
-#Define functions for pulling out all the variables called in the code
+#Define function for removing strings that are often found in command strings, but are not variable names
 
 def variable_check_prepare_string (string):
     #Remove AND, OR, TRUE and FALSE as there are frequently found in the code but are not variable names
@@ -232,14 +244,11 @@ def variable_check_prepare_string (string):
     string = re.sub(r'\bOR\b'   , '', string) #Remove 'or' where it is a standalone word and not part of a longer word
     string = re.sub(r'\bTRUE\b' , '', string) #Remove 'true' where it is a standalone word and not part of a longer word
     string = re.sub(r'\bFALSE\b', '', string) #Remove 'false' where it is a standalone word and not part of a longer word
-    string = re.sub(r'\bNOT\b'  , '', string) #Remove 'not' where it is a standalone word and not part of a longer word
-        
-    #Strip all the white space at the start of the string, allows us to correctly evaluate the first character of the string
-    string = string.lstrip()
+    string = re.sub(r'\bNOT\b'  , '', string) #Remove 'not' where it is a standalone word and not part of a longer word       
     return string
-
 ##################################################################################################################
 
+##################################################################################################################
 # Define our function for pulling out variable names from command strings
 def find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, row_number):
     words_to_remove = [] #A list we are going to populate to hold all the strings that are not variables and need removing
@@ -248,7 +257,7 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
     bracket_variables_in_string = [] #A list to hold all the variables utilising [] in their names to be handled separately
 
     strings_to_remove_from_commands = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '{', '}', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*SET', '*ELSEIF', '*SELECTABLE_IF', '*ALLOW_REUSE', '*DISABLE_REUSE', '*HIDE_REUSE', '*ELSE'\
-                                       , '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT('] #All valid string that need to be cleaned out of strings
+                                       , '*INPUT_TEXT', '*INPUT_NUMBER', '*', '[B]', '[I]', '[/B]', '[/I]', '/', '$', '@', ':', '.', ',', ';', "'", '£', 'NOT('] #All valid strings that need to be cleaned out of strings
     for string_to_remove in strings_to_remove_from_commands:
         string = string.replace(string_to_remove,' ') #Remove the string so that we are, as best as possible, just left with variable names.
 
@@ -344,9 +353,9 @@ def find_variables_in_command_strings (variables_in_file, string, bracket_variab
 
     #End function by returning the two file level lists which were passed in initially, now updated for the current string.
     return variables_in_file, bracket_variables_in_file
-
 ##################################################################################################################
 
+##################################################################################################################
 #Define our function to pull out variables from prose strings
 def find_variables_in_prose_strings (variables_in_file, string, bracket_variables_in_file, row_number):
     strings_to_remove_from_prose = ['ROUND(', 'MODULO', 'LENGTH(', '(', ')', '+', '=', '<', '>', '-', '&', '!', '%', '*IF', '*', '[B]', '[I]', '[/B]', '[/I]',\
@@ -358,22 +367,22 @@ def find_variables_in_prose_strings (variables_in_file, string, bracket_variable
     if '{' in string: #In prose, variables are called with {} - this identifies that the string contains a variable
         words_in_string = string.split() #Split the string into its component words
 
-        multi_word_string = False
+        multi_word_string = False #For each string, reset this variable which identifies if there are more than one variable witin the { }
         
         for word in words_in_string: #Loop through each word
-            if '{' in word or multi_word_string == True: #The word is a variable call
+            if '{' in word or multi_word_string == True: #The word is a variable call or the word is part of an existing { } and
                 if word.endswith('}'):
-                    multi_word_string = False
+                    multi_word_string = False #If the word is entirely bounded by { } then there is a single variable here. 
                 else:
-                    multi_word_string = True
+                    multi_word_string = True #Otherwise there is potentially more than one variable inside the { } - Spaces will also trigger this, but aren't a problem
                    
                 if '}' in word:
-                    word = word.split('}')[0] #Split out anything before or after the {} (including the {} )
+                    word = word.split('}')[0] #Split out anything after the } - including the }
 
                 if '{' in word:
-                    word = word.split('{')[1]
+                    word = word.split('{')[1] #Split out anything before the { - including the {
 
-                if not word.isnumeric() and not str.isspace(word) and word:
+                if not word.isnumeric() and not str.isspace(word) and word: #If the remaining word is a number, or empty, then ignore it - otherwise it is a variable name
                     if '[' in word: #If the variable contains a [ then handle it in the same way as a command variable
                         if any (word == file_variable[1] for file_variable in bracket_variables_in_file): #Don't do anything if the variable is already added for that file
                             pass
@@ -396,72 +405,78 @@ def find_variables_in_prose_strings (variables_in_file, string, bracket_variable
                         
                                 
     return variables_in_file, bracket_variables_in_file #Return the two lists of variables in the file
-
-
 ##################################################################################################################
 
+##################################################################################################################  
 #Define function to extract the command and prose strings from multi-replace strings
 def extract_multi_replace (string, file, row):
 
-    #There can be multiple multi-replaces in a single string, so we add the command and prose command components to lists
-    #Then loop through the lists to pass them to the functions
+    #Multi-replaces are hard because:
+        #1) The multi-replace can occur at any point in the string
+        #2) There can be more than one multi-replace in a string
+        #3) There is no universal marker to identify where the command element of the multi-replace ends and the prose begins
+
+    #There can be multiple multi-replaces in a single string, so we add all the command and prose strings to lists
     command_strings = []
     prose_strings = []
     
-    remaining_multi_replace = True
-    while remaining_multi_replace == True:
+    remaining_multi_replace = True #Set the variable for tracking if there is another multi-replace in the string to be processed
+    
+    while remaining_multi_replace == True: #Keep going until there are no more multi-replaces left
             
-        if '@{' in string:
-        #Split the string on the first occurence of the '@' symbol. So any pre-prose is cut off. The '1' means it retains anything after the @
-        #Even if there are more @ symbols in the remaining string
+        if '@{' in string: #This identifies a multi-replace
+        #Split the string on the first occurence of the '@' symbol. So any pre-prose is cut off and added as a prose string.
+        #The '1' means it retains anything after the @ (we keep processing the remaining string until all multi-replaces have been found,
+        #even if there are more @ symbols in the remaining string
             string = string.split('@{', 1)[1] #We take the 2nd element of the split (everything after the multi-replace)
-
             prose_strings.append(string.split('@{')[0]) #Pass the prose string that is cut off into the prose strings list to be processed
 
-        elif '@ {' in string:
+        elif '@ {' in string: #This also identifies a multi-replace
             string = string.split('@ {', 1)[1]
-
             prose_strings.append(string.split('@ {')[0]) #Pass the prose string that is cut off into the prose strings list to be processed
 
-        #If there are more than one multi-replace commands in the string, we can repeat this split to only take the first of them for now.
-        #The split above chops off the @ from the first multi-replace, meaning that any other @ found denotes a second multi-replace
+        #After the above split, the original multi-replace @{ is cut, so if there are any in the string, there is another multi-replace
+        #further on in the string. So we split again, cutting at the point of the next multi-replace and store that for later. We just want
+        #to work with one multi-replace at a time.
         if '@{' in string:
         #We do the same process as above, to account for a potential space between the @ and {
-            multi_replace_string = string.split('@{', 1)[0] #We take the first elementy of the split (everything before the second multi-repalce)
-            string = string.split('@{', 1)[1]
+            multi_replace_string = string.split('@{', 1)[0] #We take the first element of the split (everything before the second multi-repalce)
+            string = string.split('@{', 1)[1] #Everything else is stored as the string (so that on the next loop, it will be what is worked on)
 
         elif '@{' in string:
             #We do the same process as above, to account for a potential space between the @ and {
             multi_replace_string = string.split('@ {', 1)[0]
             string = string.split('@ {', 1)[1]
 
-        else: 
+        else: #Otherwise, there is only one multi-replace and we can just process the whole string in one go.
             multi_replace_string = string
             remaining_multi_replace = False
 
-        if multi_replace_string.startswith('('):
+        if multi_replace_string.startswith('('): #If there is a bracket in the multi-replace then it can refer to multiple variables in the condition
 
-            letters_in_string = list(multi_replace_string)
+            letters_in_string = list(multi_replace_string) #We need to parse the brackets, so split the string into a list of individual characters
 
-            number_of_brackets = 0
-            brackets_ended = False
-            end_of_multi_replace = 0
-            in_brackets = False
-            for count, letter in enumerate(letters_in_string):
-                if letter == '(' and brackets_ended == False:
-                    number_of_brackets += 1
-                    in_brackets = True
-                if letter == ')':
-                    number_of_brackets -= 1
+            number_of_brackets = 0 #We are going to track the number of 'open' brackets. This will tell us when the condition has completed (e.g. (Something (else)) - 2 sets of brackets)
+            brackets_ended = False #Flag for whether we have completing identifying the number of brackets
+            end_of_multi_replace = 0 #Variable to store the character number on which the multi-replace ends
+            in_brackets = False #Flag for whether the code is currently parsing within the brackets
+            
+            for count, letter in enumerate(letters_in_string): #Loop through each of the characters in the string
+                if letter == '(' and brackets_ended == False: #If that character is a bracket (the first one should always be) and we haven't already finished resolving the brackets
+                    number_of_brackets += 1 #Increase the counter for the number of brackets
+                    in_brackets = True #Set the flag to say we are processing the brackets
+                if letter == ')': #If it is a closing bracket
+                    number_of_brackets -= 1 #Decrease the counter for the number of brackets
 
-                if number_of_brackets == 0 and in_brackets == True:
-                    end_of_multi_replace = count
-                    brackets_ended = True
-                    in_brackets = False
+                if number_of_brackets == 0 and in_brackets == True: #If we are processing the brackets and the counter is 0, then we have reached the final closing bracket
+                    end_of_multi_replace = count #Set this position as the end of the brackets
+                    brackets_ended = True #Bracket processing has now finished - so any brackets in the rest of the string (i.e. the prose) are not counted
+                    in_brackets = False #Brakcet processing has now finished
 
-            command_strings.append (multi_replace_string[0:end_of_multi_replace])
-            prose_strings.append (multi_replace_string[end_of_multi_replace + 1 : ])
-        else:
+            command_strings.append (multi_replace_string[0:end_of_multi_replace]) #Add the command string, defined by the beginning of the string until the position we just found
+            prose_strings.append (multi_replace_string[end_of_multi_replace + 1 : ]) #Everything else is prose
+            
+        else: #If is are no brackets, there is just one variable in the multi-replace and therefore the first space denotes the split between the command and prose (or at least, the variable name in the command)
             command_strings.append (multi_replace_string.split(' ')[0])
             prose_strings.append(multi_replace_string.split(' ', 1)[1])
 
@@ -490,18 +505,18 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
     for original_string in code:
 
         string = variable_check_prepare_string (original_string[1]) #Redefine our string as just the line of code, ignoring the row number and cleanse it
+        #Strip all the white space at the start of the string, allows us to correctly evaluate the first character of the string
+        string = string.lstrip()
 
         #Identify if the string is a command string and if so pass to the command function
         if (string.startswith('*IF') or string.startswith('*SET') or string.startswith('*ELSEIF') or string.startswith('*ELSE') or string.startswith('*INPUT_TEXT') or string.startswith('*INPUT_NUMBER')):
              variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, string, bracket_variables_in_file, original_string[0]) #Pass in the cleansed string and the original row number
 
 
-        # Multi-replace in selectable if (and other choices)
-
-
         #If the command is a '*selectable_if' string, then split the string and pass the command half and prose half to the functions respectively
         elif string.startswith ('*SELECTABLE_IF'):
-            
+
+            #We can hive off the command string easily, it is everything before the #
             command_string = string.split('#')[0] #Split out before the #, giving us just the code and pass it to the function
             variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, command_string, bracket_variables_in_file, original_string[0])
 
@@ -509,43 +524,42 @@ for file, code in complete_code.items(): #Gives us the entire list of lists cont
             remaining_string = string.replace(command_string,'')#Then the remainder is the prose - cut off the command string
             remaining_string = remaining_string[1:] #Chop off the # at the beginning of the string
 
-            #If there is a multi-replae in the remaining string (see below for more info)
+            #If there is a multi-replae in the remaining string 
             if '@{' in remaining_string or '@ {' in remaining_string:
 
-                command_strings, prose_strings = extract_multi_replace (string, file, original_string[0])
+                command_strings, prose_strings = extract_multi_replace (string, file, original_string[0]) #Parse the string to split out the command and prose strings from it
 
-                for command_string in command_strings:
+                for command_string in command_strings: #We return a list of strings, so loop through them and pass each to the command function
                     variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, command_string, bracket_variables_in_file, original_string[0])
 
-                for prose_string in prose_strings:
+                for prose_string in prose_strings: #We return a list of strings, so loop through them and pass each to the prose function
                     variables_in_file, bracket_variables_in_file = find_variables_in_prose_strings (variables_in_file, prose_string, bracket_variables_in_file, original_string[0])
                 
-            else: #It is just standard prose
+            else: #The remaining string has no multi-replace
                 prose_string = remaining_string
                 variables_in_file, bracket_variables_in_file = find_variables_in_prose_strings (variables_in_file, prose_string, bracket_variables_in_file, original_string[0])
 
 
+        #If the string is prose, but contains a multi-replace then we need to split it into a command and a prose component.
         #If there is an @{ in the string then it denotes that there is a multi-replace within the string somewhere. This is a bit more complicated for 3 reasons:
-        #1) The multi-replace can occur at any point in the string
-        #2) There can be more than one multi-replace in a string
-        #3) There is no universal marker to identify where the command element of the multi-replace ends and the prose begins
-        #We first check if there is an @, but then have to specifically check for the two possible occurences of multi-replace syntax
+        
+        #We first check if there is an @{, but then have to specifically check for the two possible occurences of multi-replace syntax
         elif '@{' in string or '@ {' in string:
 
-            command_strings, prose_strings = extract_multi_replace (string, file, original_string[0])
+            command_strings, prose_strings = extract_multi_replace (string, file, original_string[0]) #Pass to the function to pull out the command and prose strings
 
-            for command_string in command_strings:
+            for command_string in command_strings: #Loop through each string and pass to the relevant function
                 variables_in_file, bracket_variables_in_file = find_variables_in_command_strings (variables_in_file, command_string, bracket_variables_in_file, original_string[0])
 
             for prose_string in prose_strings:
                 variables_in_file, bracket_variables_in_file = find_variables_in_prose_strings (variables_in_file, prose_string, bracket_variables_in_file, original_string[0])
 
    
-        #Otherwise it must be a prose string, so pass it to the prose function
+        #Otherwise the string is just standard prose and can be pased to the prose function
         else:
             variables_in_file, bracket_variables_in_file = find_variables_in_prose_strings (variables_in_file, string, bracket_variables_in_file, original_string[0])
 
-    if variables_in_file: #After finishing all the code in the file
+    if variables_in_file: #After finishing all the code in the file, if there were any variables called in it
         #Add the list of variables to the dictionary with the filename as the key
         called_variables [file] = variables_in_file
         
@@ -557,8 +571,10 @@ print ("Finished finding all variables called in all files.")
 
 
 
-##################################################################################################################                                                                         
+##################################################################################################################
+#Define function for finding defined variables that were not called
 def variable_check_variables_not_called (mode, created_variable, variable_found, called_variables, created_file):
+    #We have passed in the defined variable we are looking for
     for called_file, called_variable_row in called_variables.items(): #Loop through all the files to find if the variable is called in it
             if created_file == 'startup.txt' or called_file == created_file: #Only compare variables defined in the startup (which can be called anywhere), or variables defined in the SAME file we're checking (for temp variables)         
                 if variable_found == False: #If we haven't already found it
@@ -574,8 +590,7 @@ def variable_check_variables_not_called (mode, created_variable, variable_found,
 
 ##################################################################################################################
 #Check for whether there are any created variables that are not called in the code.
-
-variables_not_called = {}
+variables_not_called = {} #Dictionaries to hold all the variables that were not called
 bracket_variables_not_called = {}
 
 for created_file, created_variable_row in created_variables.items(): #Loop through all the files
@@ -982,7 +997,6 @@ exit_command = input ("CS test has completed successfully. Press ENTER to exit."
 ## Future functionality
 
 #Falling out of ELSE and ELSEIF without goto
-#Handling params which create a 'new variable'
 
 
 #Consistency - identify a base indent amount and evaluate against it
