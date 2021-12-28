@@ -483,8 +483,6 @@ def extract_multi_replace (string, file, row):
     return command_strings, prose_strings
 ##################################################################################################################
 
-
-
 ##################################################################################################################
 #Parse the code to pull out all the variables referenced in the code and store a list, by file, of every single one.
 
@@ -581,12 +579,13 @@ def variable_check_variables_not_called (mode, created_variable, variable_found,
                     for called_variable in called_variable_row: #Loop through all the called variables in the file
                         if variable_found == False: #If we haven't already found it
                             #If the variable we are currently comparing matches the one we are searching for. Here we take the second element of the list, as the first element is the row number
-                            if (mode == 'normal' and created_variable[1] == called_variable[1]) or (mode == 'bracket' and created_variable[1].split('_')[0] == called_variable[1].split('[')[0]):
+                            #Bracket variables are hard, because the variable name in the code is a stub of the actual name (with the remainder being provided by the [ ]. So we can't get an
+                            #exact match. Instead we have to rely on partial matching as 'good enough'
+                            if (mode == 'normal' and created_variable[1] == called_variable[1]) or (mode == 'bracket' and called_variable[1].split('[')[0] in created_variable[1]):
                                 variable_found = True #Then set it to 'found'
 
     return variable_found
 ##################################################################################################################
-
 
 ##################################################################################################################
 #Check for whether there are any created variables that are not called in the code.
@@ -594,21 +593,20 @@ variables_not_called = {} #Dictionaries to hold all the variables that were not 
 bracket_variables_not_called = {}
 
 for created_file, created_variable_row in created_variables.items(): #Loop through all the files
-    variables_not_called_in_file = []
+    variables_not_called_in_file = [] #List to hold all the variables that were not called in each file
     for created_variable in created_variable_row: #Loop through all the variables created in the file
         variable_found = False #Set the variable as 'not found' to begin with.
     
-        variable_found = variable_check_variables_not_called ('normal', created_variable, variable_found, called_variables, created_file)
+        variable_found = variable_check_variables_not_called ('normal', created_variable, variable_found, called_variables, created_file) #Call the function defined above
 
-        if variable_found == False:
+        if variable_found == False: #If we didn't find it above, it could be contained in the bracket variables, so call pass it to that function
             variable_found = variable_check_variables_not_called ('bracket', created_variable, variable_found, called_bracket_variables, created_file)
 
         if variable_found == False: #After looking for the variable in every file and not finding it, add it as a non-called variable             
             variables_not_called_in_file.append([created_variable[1], created_variable[0]])
 
-    if variables_not_called_in_file:
+    if variables_not_called_in_file: #If there are any variables not called in this file, add it to the dictionary
         variables_not_called[created_file] = variables_not_called_in_file
-
 
 print ("Finished finding all variables that were defined but never called")
 ##################################################################################################################
@@ -616,17 +614,19 @@ print ("Finished finding all variables that were defined but never called")
 
 
 ##################################################################################################################
-#Check for any called variables which are not defined in the startup or are not defined in the same file (temp)
+#Define the function to check for any called variables which are not defined in the startup or are not defined in the same file (temp)
 #Also, where it is a temp variable, it also checks if it was defined on a later row number than the one it was called on
 def variable_check_variables_not_defined (mode, called_variable, variables_defined_in_startup, created_variables, variable_defined):
                    
     for created_file, created_variable_row in created_variables.items(): #Loop through each file
-        row_defined_on = 0
+        row_defined_on = 0 #Pre-set this variable
         if created_file == 'startup.txt' or called_file == created_file: #If the file is startup or the same file we are checking, then proceed (we don't want to check temp variables in other files)
             if variable_defined == False: #If we haven't already found it
                 for created_variable in created_variable_row: #Loop through each created variable in that file
                     if variable_defined == False: #If we haven't se the variable to defined yet
-                        if (mode == 'normal' and called_variable[1] == created_variable[1]) or (mode == 'bracket' and called_variable[1].split('[')[0] == created_variable[1].split('_')[0]): #Then check if the variable we are checking matches the one we are searching for
+                        #Bracket variables are hard, because the variable name in the code is a stub of the actual name (with the remainder being provided by the [ ]. So we can't get an
+                        #exact match. Instead we have to rely on partial matching as 'good enough'
+                        if (mode == 'normal' and called_variable[1] == created_variable[1]) or (mode == 'bracket' and called_variable[1].split('[')[0] in created_variable[1]): #Then check if the variable we are checking matches the one we are searching for
                             variable_defined = True #And if so, set it to 'defined'
                             if created_file != 'startup.txt':
                                 row_defined_on = created_variable[0] #Record the row number to now check which row it was defined on
@@ -637,113 +637,133 @@ def variable_check_variables_not_defined (mode, called_variable, variables_defin
                                     variables_defined_in_startup.append(called_variable[1].split('[')[0]) #We query this list so that if we encounter the same variable in a different file, we already know it has been defined
                 
     return variables_defined_in_startup, variable_defined, row_defined_on
-
-
 ##################################################################################################################
 
-variables_not_defined = {}
-variables_called_before_defined = {}
-variables_defined_in_startup = []
+##################################################################################################################
+#Check each called variable to see if it was defined either in the startup or as a temp in that file
+variables_not_defined = {} #Dictionaries to hold the non-defined variables
+variables_called_before_defined = {} #Or those called before they were defined
+variables_defined_in_startup = [] #A list to track which variables we have already identified as being defined - so we don't repeat processing
 
 for called_file, called_variable_row in called_variables.items(): #Loop through our files
-    variables_not_defined_in_project = []
+    variables_not_defined_in_project = [] #Lists to hold the variables as we go
     variables_called_before_defined_in_project = []
     for called_variable in called_variable_row: #Loop through each called variable in the file
 
         if called_variable[1] not in variables_defined_in_startup: #If the variable name is in our list (generated in these loops), then we already know it has been defined and can be skipped       
             variable_defined = False #Set variable as not defined, until we see that it is
-     
+
+            #Call the function to check if this variable is defined in the startup or as a temp in this file
             variables_defined_in_startup, variable_defined, row_defined_on = variable_check_variables_not_defined ('normal', called_variable, variables_defined_in_startup, created_variables, variable_defined)
-
-            if variable_defined == False:
-                if called_file in called_bracket_variables.keys():
-                    for called_bracket_variable in called_bracket_variables[called_file]:
-                        if called_bracket_variable[1].split('[')[0] not in variables_defined_in_startup:
-                            variables_defined_in_startup, variable_defined, row_defined_on = variable_check_variables_not_defined ('bracket', called_bracket_variable[1], variables_defined_in_startup, created_variables, variable_defined)
-
 
             if variable_defined == False and called_variable[1] != 'IMPLICIT_CONTROL_FLOW' and called_variable[1] != 'CHOICE_RANDOMTEST': #If we get through all the files and we never find the variable, add it as a non-defined variable
                 variables_not_defined_in_project.append([called_variable[1], called_variable[0]])
             else:
                 if called_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
                     variables_called_before_defined_in_project.append ([called_variable[1], called_variable[0], row_defined_on])
-            
+
+
+    #Move on to looking at bracket variables here - which is weird as it is within the wider loop for the normal variables. The reason for this is because we want to append all the non-defined variables to the same
+    #list and add them all to the same dictionary key. So whilst we are 'within' one file in the main loop, we then look at the same file's bracket variables and loop through those.
+    if called_file in called_bracket_variables.keys(): #If we have some defined bracket variables in the file we are currently looping through
+        for called_bracket_variable in called_bracket_variables[called_file]: #Then loop through all the called bracket variables in the dictionary values for this file
+            if called_bracket_variable[1].split('[')[0] not in variables_defined_in_startup: #And only look at variables we haven't already found in the startup
+                #Pass to the same function, which is set to 'bracket' mode.
+                variables_defined_in_startup, variable_defined, row_defined_on = variable_check_variables_not_defined ('bracket', called_bracket_variable[1], variables_defined_in_startup, created_variables, variable_defined)
+
+                #And add it in the same way fif we didn't find it
+                if variable_defined == False: #If we get through all the files and we never find the variable, add it as a non-defined variable
+                    variables_not_defined_in_project.append([called_bracket_variable[1], called_bracket_variable[0]])
+                else:
+                    if called_variable[0] <= row_defined_on: #Otherwise check what row it was called on and if it was defined on an earlier row, add it to the list
+                        variables_called_before_defined_in_project.append ([called_bracket_variable[1], called_bracket_variable[0], row_defined_on])
+
+    #If at least one variable was found to not have been defined, then add the list to the dictionary
     if variables_not_defined_in_project:
         variables_not_defined[called_file] = variables_not_defined_in_project
-
-    if variables_called_before_defined_in_project:
+ 
+    if variables_called_before_defined_in_project: #And the same for the variables called before being defined
         variables_called_before_defined[called_file] = variables_called_before_defined_in_project
 
-
-print ("Finished finding all variables that were called but never defined")
-        
+print ("Finished finding all variables that were called but never defined")       
 ##################################################################################################################
-#Parse the complete code to measure the indents on each line to spot cases where potentially the indent is incorrect
-#And spot code errors
-#And spot cases where the code falls out of options, else and elseif
+
+
+
+##################################################################################################################
+def fell_out_of_choice (file_invalid_code, previous_option_string, previous_option_string_line, fake_choice):
+    file_invalid_code.append([previous_option_string, previous_option_string_line, 'When implicit_control_flow is FALSE you must end every option block with a GOTO, ENDING or FINISH'])
+    previous_option_string = '' #Reset flags as the option block is finished
+    previous_option_string_line = 0
+    fake_choice = False
+    return file_invalid_code, previous_option_string, previous_option_string_line, fake_choice
+
+
+##################################################################################################################
+#Parse the complete code to measure the indents on each line to spot cases where the indent is potentially incorrect
+#Also spots a number of code errors, including:
+  #Where the code falls out of options, else and elseif
+  #Where the command is incorrectly typed
 
 #Dictionaries to store all the errors
 invalid_indents = {}
 invalid_code = {}
 
-#Initialises variables we need with initial values
-previous_prose = False #Whether the previous line was prose
-previous_command = False #Whether the previous line was just a command
-current_prose = False #Whether the current line is prose
-current_command = False #Whether the current line is just a command
-option_string = '' #Value of the previous line in an option
-option_string_line = 0 #Row number of the previous line in an option
-
-in_choice = False #Whether a choice block is being evaluated
-fake_choice = False #Whether the choice block is a false one or not - for icf tracking
-in_option = False #Whether an option block is being evaluated
-previous_option_indent = 0 #The indent of the previous option block
-in_if = False #Whether an if block is being evaluated
-
-
+#Valid commands to check they correctly have an asteriks before them
+commands = ['IF', 'SET', 'ELSEIF', 'ELSE', 'INPUT_TEXT', 'INPUT_NUMBER', 'SELECTABLE_IF', 'PAGE_BREAK', 'LINE_BREAK', 'ALLOW_REUSE', 'DISABLE_REUSE', 'HIDE_REUSE', 'TEMP', 'CREATE', 'GOTO', 'GOSUB',\
+            'FAKE_CHOICE', 'COMMENT', 'LABEL', 'CHOICE', 'RETURN', 'STAT_CHART', 'ACHIEVE', 'TEXT_IMAGE', 'FEEDBACK', 'PARAMS', 'ACHIEVEMENT', 'BUG', 'LINK', 'RAND', 'LOOPLIMIT', 'SUBSCRIBE', 'ENDING',\
+            'FINISH', 'IMAGE', 'AUTHOR', 'SCENE_LIST', 'SAVE_GAME', 'TITLE']
+prose_strings = ["'", ',', ' YOU ', ' THE ', ' A ', ' TO ', ' OF ', ' WITH ']
 
 for file, code in complete_code.items(): #Loop through each file
-    file_invalid_indents = []
+    file_invalid_indents = [] #Lists to store all the errors for this file
     file_invalid_code = []
 
+    #Initialises variables we need
     choice_indents = [] #List to hold all the indents of each active choice block
     active_choices = 0 #Total number of active choices being evaluated
+    in_choice = False #Whether a choice block is being evaluated
+    fake_choice = False #Whether the choice block is a false one or not - for icf tracking
+    
     option_indents = [] #List to hold all the indents of each active option block
-    if_indents = [] #List to hold all the idnents of each active if block
+    in_option = [] #A list to track whether we are currently evaluating an option within each nested choice block=
+    option_row = 0 #The row number of the beginning of the option block
+    option_string = '' #Value of the previous line in an option
+    option_string_row = 0 #Row number of the previous line in an option
+    previous_option_indent = 0 #The indent of the previous option block
+    previous_option_string = '' #Reset the option string
+    previous_option_string_row = 0
+    
+    if_indents = [] #List to hold all the indents of each active if block
     active_ifs = 0 #Total number of if blocks being evaluated
-    in_choice = False #Reset the flags for the new file
-    fake_choice = False
-    in_option = False
-    in_if = False
+    in_if = False #Whether an if block is being evaluated
+    
     expected_indent = 0 #First line will always be expected to have no indent
     previous_indent = 0 #File always starts without a previous indent
-    previous_option_string = '' #Reset the option string
-    previous_option_string_line = 0
-    first_option = False #Whether this is the first option in the choice
+    previous_prose = False #Whether the previous line was prose
+    previous_command = False #Whether the previous line was a command
+    current_prose = False #Whether the current line is prose
+    current_command = False #Whether the current line is a command 
 
-    for original_string in code: #Loops through each string
+    for original_string in code: #Loops through each string of code in the file
         string = original_string[1] #Takes just the string, leaving the row number
+        string_row = original_string[0] #Takes the row number of the string
         no_space_string = string.lstrip() #Strip the indent so we can check what the string actually starts with
 
-        #If the line starts with an asteriks and there is gap before the command
+        ### CODE CHECKING ###
+        #If the line starts with an asteriks and there is gap before the command then it is an invalid command
         if no_space_string.startswith('* '):
-            file_invalid_code.append([string, original_string[0], 'The * is followed by a space, the command must follow the * without a space'])
+            file_invalid_code.append([string, string_row, 'The * is followed by a space, the command must follow the * without a space'])
 
-        #Valid commands to check they correctly have an asteriks before them
-        commands = ['IF', 'SET', 'ELSEIF', 'ELSE', 'INPUT_TEXT', 'INPUT_NUMBER', 'SELECTABLE_IF', 'PAGE_BREAK', 'LINE_BREAK', 'ALLOW_REUSE', 'DISABLE_REUSE', 'HIDE_REUSE', 'TEMP', 'CREATE', 'GOTO', 'GOSUB',\
-                    'FAKE_CHOICE', 'COMMENT', 'LABEL', 'CHOICE', 'RETURN', 'STAT_CHART', 'ACHIEVE', 'TEXT_IMAGE', 'FEEDBACK', 'PARAMS', 'ACHIEVEMENT', 'BUG', 'LINK', 'RAND', 'LOOPLIMIT', 'SUBSCRIBE', 'ENDING',\
-                    'FINISH', 'IMAGE', 'AUTHOR', 'SCENE_LIST', 'SAVE_GAME', 'TITLE']
-        #When assessing this, it will pickin up valid prose lines that start with some of the command string values. This list contains common words/punctuation in prose
-        #that should not appear in command lines - so we can filter out the prose lines using these
-        prose_strings = ["'", ',', ' YOU ', ' THE ', ' A ', ' TO ', ' OF ', ' WITH ']
-
+        #When assessing this, it will pick up valid prose lines that start with some of the command string values. Uses the list of prose strings which contains common
+        #words/punctuation in prose that should not appear in command lines - so we can filter out the prose lines using these 
         #If any string starts with the command (no asteriks) and doesn't have any of our 'prose strings' in it - we assume it is a command missing the asteriks
         if any(no_space_string.startswith(command) for command in commands) and not any (prose_string in no_space_string for prose_string in prose_strings):
-                file_invalid_code.append([string, original_string[0], 'The command is missing an asteriks (*)'])
+                file_invalid_code.append([string, string_row, 'The command is missing an asteriks (*)'])
 
         #If we have an asteriks that isn't followed by any of our commands, we assume the command is mistyped
         if no_space_string.startswith('*') and not any (no_space_string.startswith('*'+command) for command in commands):
-                file_invalid_code.append([string, original_string[0], 'The command following the asteriks(*) is not recognised'])
+                file_invalid_code.append([string, string_row, 'The command following the asteriks(*) is not recognised'])
 
         #If the string is setting implicit control flow in some way, we record it
         if 'IMPLICIT_CONTROL_FLOW' in string and 'SET' in string:
@@ -751,80 +771,77 @@ for file, code in complete_code.items(): #Loop through each file
                 file_icf = True
             else:
                 file_icf = False
-            
+        ### END OF CODE CHECKING ###
+
+        ### INDENT CHECKING ###
         actual_indent = len(string) - len(string.lstrip(' ')) #The indent of the string
         current_prose = False #Resets the flags for the type of string it is
         current_command = False
         option_line = False
         comment_return_line = False
 
+        #If we are currently inside a choice, we need to evaluate these. Specifically, whether this current string is denoting that we have left a choice block.
+        #If there are nested choices, we could leave multiple choice blocks in one go - so we loop through all active choices to check
         for count in range (active_choices):
-            if in_choice == True: #If currently evaluating a choice block
+            if in_choice == True: #If currently evaluating a choice block. Otherwise do nothing
 
-                if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the choice command
+                if actual_indent <= choice_indents[active_choices - 1]: #And the indent of this line is less than or equal to the indent of the most recent choice command
+
+                    if len(option_indents) < active_choices: #If we have left the choice block, but we didn't have even one option block, then these two will be out of sync and constitute a choice block without any options
+                        file_invalid_code.append([string, string_row, 'The choice block was ended without having at least one option block inside it'])
+                    
                     choice_indents.pop(active_choices - 1) #Then this choice is finished, remove its indent
-                    option_indents.pop(active_choices - 1) #And remove the option indent
+                    option_indents.pop(active_choices - 1) #And remove the option indent for the last option in this choice
+                    in_option.pop(active_choices - 1) #And remove the value for the in_option flag for this choice
+
+                    #We are closing an option block, so need to check if we fell out without a relevant command
+                    if file_icf == False and fake_choice == False and not (previous_option_string.startswith('*GO') or previous_option_string.startswith('*FINISH') or previous_option_string.startswith('*ENDING')):
+                        file_invalid_code, previous_option_string, previous_option_string_row, fake_choice = fell_out_of_choice(file_invalid_code, previous_option_string, previous_option_string_row, fake_choice)
+                    
                     active_choices -= 1 #Total active choices is reduced by one
-                    in_option = False #No longer in an option
-                    first_option = False #Reset the first option flag
-                    previous_prose = False
-                    if active_choices == 0: #If there are now no active choices, it is no longer evaluating a choice
+                    previous_prose = False #When leaving a choice, the indent rules of following prose with an equal indent no longer apply, so this is not relevant
+
+                    if active_choices == 0: #If there are now no active choices, it is no longer evaluating any choices or options
                         in_choice = False
+                    
+                    
+        #If it is evaluating an option, we check if we have left that option and if the code fell out of it incorrectly
+        if in_choice == True:
+            if in_option[active_choices - 1] == True:
 
-        #If it is evaluating an option and either the current line is a new choice, or the current line is an IF which is inside the choice and outside the current option
-        #Then we are no longer in an option
-        if in_option == True:
+                option_string = no_space_string #For checking falling out of options, we need to be able to check the last line of the option - this records the current value
+                option_string_row = string_row
 
-            option_string = no_space_string #For checking falling out of options, we need to be able to check the last line of the option - this records it
-            option_string_line = original_string[0]
-            
-            #A new option block
-            if ((no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF')) or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
-                 (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string)):
-                in_option = False
-                previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
+                #If the current indent is less than or equal to the indent of the previous option, then we have left the previous option. This could be to an *IF statement, another option, or out of the choice.
+                if len(option_indents) == active_choices:
+                    if actual_indent <= option_indents[active_choices - 1]:
+                        in_option[active_choices - 1] = False
+                        previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
 
-            #An IF block that sits inside the first choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
-            if active_choices == 1:
-                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 1] and actual_indent <= option_indents[active_choices - 1]:
-                    in_option = False
-                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
+                        #If there was nothing inside the option, then the option is invalid
+                        if string_row == option_row + 1:
+                            file_invalid_code.append([string, string_row, 'The option block was closed without any content within it'])
 
-            #An IF block that sits inside an embedded choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
-            #This scenario is for when it is the first IF, right under the choice. So the choice counter has iterated by 1, but the option has not. 
-            if active_choices > 1 and len(option_indents) < active_choices:
-                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 2] and actual_indent <= option_indents[active_choices - 2]:
-                    in_option = False
-                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
-
-            #An IF block that sits inside an embedded choice, which determines if an option shows, so it is not indented under an option. It sits between 2 options
-            if active_choices > 1 and len(option_indents) == active_choices:
-                if no_space_string.startswith('*IF') and actual_indent > choice_indents[active_choices - 1] and actual_indent <= option_indents[active_choices - 1]:
-                    in_option = False
-                    previous_prose = False #When we exit an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
-
-            if in_option == False and file_icf == False and fake_choice == False and not (previous_option_string.startswith('*GO') or previous_option_string.startswith('*FINISH') or previous_option_string.startswith('*ENDING')):
-                file_invalid_code.append([previous_option_string, previous_option_string_line, 'When implicit_control_flow is FALSE you must end every option block with a GOTO, ENDING or FINISH'])
-                previous_option_string = False
-                previous_option_string_line = 0
-                fake_choice = False
+                        #If we have come out of an option block (in_option is now false) and icf is off, then we check if we have fallen out of the option without a goto or equivalent
+                        if file_icf == False and fake_choice == False and not (previous_option_string.startswith('*GO') or previous_option_string.startswith('*FINISH') or previous_option_string.startswith('*ENDING')):
+                            file_invalid_code, previous_option_string, previous_option_string_row, fake_choice = fell_out_of_choice(file_invalid_code, previous_option_string, previous_option_string_row, fake_choice)
             
         #If it is evaluating an IF and the indent of this line is less than or equal to the IF command, then no longer in an IF
-        for count in range (active_ifs):
+        for count in range (active_ifs): #Iterate through all the active IFs in case we need to close off more than one
             if in_if == True and actual_indent <= if_indents[active_ifs - 1]:
                 if_indents.pop(active_ifs - 1)   
-                active_ifs -= 1
-                if active_ifs == 0:
+                active_ifs -= 1 
+                if active_ifs == 0: #If there are not more active IFs
                     in_if = False
                 previous_prose = False #This is set because the previous line in an IF could be prose - and this then sets requirements on the existing line (has to have same indent)
                                         #But as the code comes out of the IF, the indent requirement rests and the presense of the previous prose line is irrelevant
-
 
         #If the current string is a choice statement, set in_choice, increase active choices and add the indent. This allows for nested choices, each one tracked as an element in the list
         if (no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE')):
             in_choice = True
             active_choices += 1
             choice_indents.append (actual_indent)
+            in_option.append(False)
             previous_prose = False
 
             #For checking if the code falls out of a choice, this tells us if fake choice was used, so we can say icf is true for this true
@@ -834,35 +851,35 @@ for file, code in complete_code.items(): #Loop through each file
         #If the current string is an option, then set in_option and option_line (the line that initiates the option). Then adds the indent of the option to the list
         elif no_space_string.startswith('#') or no_space_string.startswith('*SELECTABLE_IF') or (no_space_string.startswith('*ALLOW_REUSE') and '#' in no_space_string) or\
              (no_space_string.startswith('*DISABLE_REUSE') and '#' in no_space_string) or (no_space_string.startswith('*HIDE_REUSE') and '#' in no_space_string):
-            in_option = True
+            in_option[active_choices - 1] = True
             option_line = True
+            option_row = string_row
+            previous_prose = False #When we enter an option block, the requirements to follow prose with the same indent do not apply, so we can set this to false
 
             #If there are no active choices, then there should be no options.
             if active_choices == 0:
-                file_invalid_code.append([string, original_string[0], 'Choice option (#) is not contained within a *choice block'])
-                in_option = False
+                file_invalid_code.append([string, string_row, 'Choice option (#) is not contained within a *choice block'])
+                in_option = [] #And reset the flags
                 option_line = False
 
-            elif len(option_indents) == active_choices: #Each option in a choice must have the same or lower indent than the previous option. If this is the first option for the choice
-                option_indents[active_choices - 1] = actual_indent #Then add it to the list of option indents
+            #If there is an active choice, then each option in a choice must have the same or lower indent than the previous option. So we need to record the indent of the previous option in the choice block
+            elif len(option_indents) == active_choices: #If the length of the option indent list is the same as the choice
+                option_indents[active_choices - 1] = actual_indent #then we have already added at least one option for this block, so we just update the indent with the current indent
 
-            else: #Otherwise it is a subsequent option, setting the new requirement for the maximum indent of the next option. So overwrite the indent value for this choice block
+            else: #Otherwise this must be the first option for this choice block, so we append the actual indent as a new value in the list
                 option_indents.append(actual_indent)
-                
-            if first_option == False: #If first option is false, then this must be the first option, so set it
-                first_option = True
-            else: #Otherwise, first option is already set, so this can not be the first option, so un-set it
-                first_option = False
 
-        #If the string starts with an * or is an option line, then evaluate          
+        #Work out what kind of string we are actually processing:
+        #If it is a command line, the start of an option or an opposed_pair for a stat chart 
         if (no_space_string.startswith('*') or option_line == True or no_space_string.startswith('OPPOSED_PAIR')):
             if '*COMMENT' in no_space_string or '*RETURN' in no_space_string: #If it is a comment or return, then it can ignore indent rules
                 comment_return_line = True
-            elif '*IF' in no_space_string or '*ELSEIF' in no_space_string or '*ELSE' in no_space_string or '*STAT_CHART' in no_space_string or 'OPPOSED_PAIR' in no_space_string or '*ACHIEVEMENT' in no_space_string: #If it is an IF command, then we are now evaluating an IF command
-                in_if = True
+            #If it is an IF command, then we are now evaluating an IF command. Stat charts and achievements also follow the same rules, so get classed as an IF for ease.
+            elif '*IF' in no_space_string or '*ELSEIF' in no_space_string or '*ELSE' in no_space_string or '*STAT_CHART' in no_space_string or 'OPPOSED_PAIR' in no_space_string or '*ACHIEVEMENT' in no_space_string:
+                in_if = True #Set flag and add indent
                 active_ifs += 1
                 if_indents.append(actual_indent)
-            else: #Otherwise we can just say we're evaluating any other command line
+            else: #Otherwise we can just say we're evaluating any other command line - no distinction is required
                  current_command = True
               
         else: #If none of the above, then it must be prose
@@ -873,47 +890,47 @@ for file, code in complete_code.items(): #Loop through each file
         #If this is an option line (the line that generates the option), then its indent must not be less than or equal to its calling choice command
         if option_line == True:
             if actual_indent <= choice_indents[active_choices -1] and comment_return_line == False:
-                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block must have a greater indent than the *choice command', choice_indents[active_choices - 1], actual_indent])
+                file_invalid_indents.append([string, string_row, 'Options (#) within a choice block must have a greater indent than the *choice command', choice_indents[active_choices - 1], actual_indent])
 
         #And it must not have a greater indent then the previous option in this block (by checking the list item for the number of choice we are on). If the line is the first option or a comment/return then
-        #we don't check this, as it can have any indent
-            if actual_indent > option_indents[active_choices - 1] and first_option == False and comment_return_line == False:
-                file_invalid_indents.append([string, original_string[0], 'Options (#) within a choice block can not have a greater indent that previous options', option_indents[active_choices - 1], actual_indent])
-
+        #we don't check this (or rather, it will check its indent against itself and pass), as it can have any indent
+            if actual_indent > option_indents[active_choices - 1] and comment_return_line == False:
+                file_invalid_indents.append([string, string_row, 'Options (#) within a choice block can not have a greater indent that previous options', option_indents[active_choices - 1], actual_indent])
 
         #If we are in an option, but not on the option line and it isn't a comment or return
-        if in_option == True and option_line == False and comment_return_line == False:
-            #If this line is a new choice, or an IF statement that is part of a new choice, but before the first option block (i.e. an IF to determine if the option shows)
-            #Then we evaluate the indent of the PREVIOUS option block - because a new choice has been added, but no options yet. So the indent of these only has to be greater
-            #than the original option block.
-            if ((no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE')) or (no_space_string.startswith('*IF') and active_choices > len(option_indents))):
-                if actual_indent <= option_indents[active_choices - 2]:
-                    file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 2], actual_indent])
-            else: #Otherwise, we are looking at an option within a choice block and we just compare against the indent of that option block itself
-                if actual_indent <= option_indents[active_choices - 1]:
-                    file_invalid_indents.append([string, original_string[0], 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 1], actual_indent])
-
-        #If this is an IF block and there is no IF in the string (i.e. it's not the originating IF command) then the indent has to be greater than the IF indent
-        #This should actually be impossible to trigger because as soon as the actual indent is the same or less than, we turn off in_if
-        if in_if == True and ('*IF' not in no_space_string and '*ELSEIF' not in no_space_string and '*ELSE' not in no_space_string and '*STAT_CHART' not in no_space_string and 'OPPOSED_PAIR' not in no_space_string and '*ACHIEVEMENT' not in no_space_string) and actual_indent <= if_indents[active_ifs - 1]:
-             file_invalid_indents.append([string, original_string[0], 'The contents of an if statement must have a greater indent than the if command', if_indents[active_ifs - 1], actual_indent])
+        if in_choice == True:
+            if in_option[active_choices - 1] == True and option_line == False and comment_return_line == False:
+                #If this line is a new choice then we evaluate the indent of the PREVIOUS option block - because a new choice has been added, but no options yet. So the indent of these only has to be greater
+                #than the original option block.
+                if ((no_space_string.startswith('*CHOICE') or no_space_string.startswith('*FAKE_CHOICE'))):
+                    if actual_indent <= option_indents[active_choices - 2]:
+                        file_invalid_indents.append([string, string_row, 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 2], actual_indent])
+                else: #Otherwise, we are looking at an option within a choice block and we just compare against the indent of that option block itself
+                    if actual_indent <= option_indents[active_choices - 1]:
+                        file_invalid_indents.append([string, string_row, 'The contents of an option (#) must have a greater indent than the option command', option_indents[active_choices - 1], actual_indent])
 
         #If the previous string was prose, then the following line must have the same indent. Unless it is calling a new option, or is a comment or return line                
         if previous_prose == True:
             if actual_indent != previous_indent and option_line == False and comment_return_line == False:
-                file_invalid_indents.append([string, original_string[0], 'Prose and command lines following prose must have the same indent', previous_indent, actual_indent])
+                file_invalid_indents.append([string, string_row, 'Prose and command lines following prose must have the same indent', previous_indent, actual_indent])
 
         #Store the previous values
         previous_prose = current_prose
         previous_indent = actual_indent
         previous_option_string = option_string
-        previous_option_string_line = option_string_line
+        previous_option_string_row = option_string_row
 
 
+    #For each file, add all the invalid code/indents to the dictionary
     invalid_indents[file] = file_invalid_indents
     invalid_code[file] = file_invalid_code
 
 print ("Finished finding all lines of code that were improperly indented")
+
+#Add in handling of an *IF between options (or after choice and before first option) - so that we are considered in_option when required
+#If ending a choice block - with a following option
+
+
 ##################################################################################################################
 
 
