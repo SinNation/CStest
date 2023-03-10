@@ -39,8 +39,8 @@ isort = "^5.10.1"
 
 
 
-#[tool.poetry.plugins."console_scripts"]
-#cstest = "cstest.CStest.find_variables_in_command_strings"
+[tool.poetry.plugins."console_scripts"]
+cstest = "cstest.main:run_cstest"
 
 [tool.pytest.ini_options]
 addopts = "--cov=cstest"
