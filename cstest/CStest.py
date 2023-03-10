@@ -7,47 +7,6 @@ import pathlib
 
 
 ##################################################################################################################
-# Set up the test folder to store all the test outcomes
-try:
-    if not os.path.exists(
-        tests_path + "\\" + project_folder
-    ):  # Checks if the directory already exists, so it won't try to recreate it
-        os.makedirs(tests_path + "\\" + project_folder)
-    os.makedirs(
-        tests_path
-        + "\\"
-        + project_folder
-        + "\\"
-        + str(timestamp.strftime("%Y-%m%d-%H%M%S"))
-    )
-except:
-    print(
-        "******************************************************************************************\
-           \nCStest encountered an error when trying to create the test directory.\
-           \nPlease report this as a bug with the following information:\
-           \nAttempted to make this directory: "
-        + tests_path
-        + "\\"
-        + project_folder
-        + "\\"
-        + str(timestamp.strftime("%Y-%m%d-%H%M%S"))
-        + "\
-           \n******************************************************************************************\
-           \n\
-           \n"
-    )
-    input("Press ENTER to exit")
-test_run_path = (
-    tests_path
-    + "\\"
-    + project_folder
-    + "\\"
-    + str(timestamp.strftime("%Y-%m%d-%H%M%S"))
-)
-##################################################################################################################
-
-
-##################################################################################################################
 # Parse all the files to ingest the complete code in the game. Remove line breaks and CS defined line and page breaks
 # Then remove strings which are now wholly comprised of blank space. Then remove empty strings.
 complete_code = {}  # Dictionary to hold all the code in the game

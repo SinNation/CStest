@@ -1,11 +1,15 @@
 from cstest.cli.util import welcome
-from cstest.content.project import setup_project
-from cstest.process.orchestrate import test_project
+from cstest.content.project import Project
+from cstest.config.core import Config
 
 
 def run_cstest() -> None:
     welcome()
 
-    project = setup_project()
+    config = Config()
+    config.config_test()
 
-    test_project(project)
+    project = Project(config.project_name, config.project_path, config.test_path)
+    project.test_project()
+
+    print(project)

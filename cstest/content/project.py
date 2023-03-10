@@ -2,32 +2,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cstest.cli.util import banner
+from cstest.content.file import File
+from cstest.content.variable import Variable
+from cstest.content.context import Context
 from cstest.constants import PROJECTS_PATH
 
 
 @dataclass
 class Project:
-    folder_path: Path
+    project_name: str
+    project_folder: Path
+    test_path: Path
     file_list: list[Path] = field(init=False)
+    files: list[File] = field(init=False)
+    variables: list[Variable] = field(init=False)
+    context: Context = field(init=False)
 
     def scrape_files(self) -> None:
-        self.file_list = [file for file in self.folder_path.glob("*.txt")]
+        self.file_list = [file for file in self.project_folder.glob("*.txt")]
 
-
-def setup_project() -> Project:
-    while True:
-        banner("")
-        folder_name = input(
-            "What is the folder name of the project you would like to test?"
-        )
-        folder_path = PROJECTS_PATH / folder_name
-
-        if folder_path.exists():
-            break
-        else:
-            print(
-                f"The folder: {folder_name} does not exist in directory:"
-                f" {PROJECTS_PATH}."
-            )
-
-    return Project(folder_path)
+    def test_project(self) -> None:
+        self.scrape_files()

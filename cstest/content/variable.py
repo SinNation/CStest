@@ -2,5 +2,5 @@ from dataclasses import dataclass
 
 
 @dataclass
-class File:
+class Variable:
     pass
