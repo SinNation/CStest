@@ -1,0 +1,96 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "cstest"
+version = "0.0.1"
+description = "Testing utility for Choicescript games"
+authors = ["Philip S"]
+readme = "README.md"
+repository = "https://github.com/SinNation/CStest"
+
+packages = [
+    { include = "cstest" },
+]
+
+exclude = [
+    ".github",
+    ".flake8",
+    ".pylintrc",
+    "mypy.ini",
+    ".coveragerc",
+    "Makefile",
+    "scripts",
+    "tests"
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.1.0"
+flake8 = "^6.0.0"
+mypy = "^1.1.1"
+pytest-cov = "^3.0.0"
+pre-commit = "^2.20.0"
+isort = "^5.10.1"
+
+
+
+[tool.poetry.plugins."console_scripts"]
+cstest = "cstest.main:run_cstest"
+
+[tool.pytest.ini_options]
+addopts = "--cov=cstest"
+testpaths = [
+    "tests",
+]
+
+[tool.mypy]
+mypy_path = "cstest"
+check_untyped_defs = true
+disallow_any_generics = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+no_implicit_reexport = true
+
+#tool.setuptools.package-data]
+#flexi = "py.typed"
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+  | foo.py           # also separately exclude a file named foo.py in
+                     # the root of the project
+)
+'''
