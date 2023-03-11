@@ -1,5 +1,6 @@
 sample/
 data/
+cstest/CStest.py
 
 ### dotfiles ###
 .vscode/

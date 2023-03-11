@@ -1,5 +1,5 @@
-from typing import Any
 import os
+from typing import Any
 
 
 def highlight(text: Any, bold: bool = False) -> str:
@@ -12,9 +12,8 @@ def banner(text: str) -> None:
 
 
 def welcome() -> None:
-    banner("cstest")
+    banner("welcome to cstest")
     print(
-        """Welcome to CStest. An automated testing tool for Choicescript.
-    NOTE: The cstest folder must be in the same folder as your Choicescript projects.
+        """NOTE: The cstest folder must be in the same folder as your Choicescript projects.
     Otherwise the tool will not be able to find your project."""
     )
