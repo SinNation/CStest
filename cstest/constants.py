@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -8,17 +9,28 @@ CS_PATH = Path.cwd()
 DATA_PATH = CS_PATH / "data"
 PROJECTS_PATH = CS_PATH.parents[0]
 
-COMMANDS = {
-    "*CREATE": "creation",
-    "*TEMP": "creation",
-    "*SET": "access",
-    "*SELECTABLE_IF": "access_prose",
-    "*IF": "access",
-    "*ELSE": "access",
-    "*ELSEIF": "access",
-    "*INPUT_TEXT": "access",
-    "*INPUT_NUMBER": "access",
-}
+INVALID_LINE_FILE = "invalid_line.csv"
+
+
+@dataclass
+class CommandType:
+    type: str
+    name: str
+
+
+class Commands(Enum):
+    PROSE = CommandType("prose", "PROSE")
+    CREATE = CommandType("creation", "CREATE")
+    TEMP = CommandType("creation", "TEMP")
+    SET = CommandType("access", "SET")
+    SELECTABLE_IF = CommandType("access_prose", "SELECTABLE_IF")
+    IF = CommandType("access", "IF")
+    ELSE = CommandType("access", "ELSE")
+    ELSEIF = CommandType("access", "ELSEIF")
+    INPUT_TEXT = CommandType("access", "INPUT_TEXT")
+    INPUT_NUMBER = CommandType("access", "INPUT_NUMBER")
+    COMMENT = CommandType("comment", "COMMENT")
+    INVALID = CommandType("invalid", "INVALID")
 
 
 COMMON_NON_VARIABLE_WORDS = [
