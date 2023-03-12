@@ -14,23 +14,25 @@ INVALID_LINE_FILE = "invalid_line.csv"
 
 @dataclass
 class CommandType:
-    type: str
+    variable_handle_type: str
+    conditional: bool
+    effect: bool
     name: str
 
 
 class Commands(Enum):
-    PROSE = CommandType("prose", "PROSE")
-    CREATE = CommandType("creation", "CREATE")
-    TEMP = CommandType("creation", "TEMP")
-    SET = CommandType("access", "SET")
-    SELECTABLE_IF = CommandType("access_prose", "SELECTABLE_IF")
-    IF = CommandType("access", "IF")
-    ELSE = CommandType("access", "ELSE")
-    ELSEIF = CommandType("access", "ELSEIF")
-    INPUT_TEXT = CommandType("access", "INPUT_TEXT")
-    INPUT_NUMBER = CommandType("access", "INPUT_NUMBER")
-    COMMENT = CommandType("comment", "COMMENT")
-    INVALID = CommandType("invalid", "INVALID")
+    PROSE = CommandType("prose", False, False, "*PROSE")
+    CREATE = CommandType("creation", False, True, "*CREATE")
+    TEMP = CommandType("creation", False, True, "*TEMP")
+    SET = CommandType("access", False, True, "*SET")
+    SELECTABLE_IF = CommandType("access_prose", True, False, "*SELECTABLE_IF")
+    IF = CommandType("access", True, False, "*IF")
+    ELSE = CommandType("access", False, False, "*ELSE")
+    ELSEIF = CommandType("access", True, False, "*ELSEIF")
+    INPUT_TEXT = CommandType("access", False, True, "*INPUT_TEXT")
+    INPUT_NUMBER = CommandType("access", False, True, "*INPUT_NUMBER")
+    COMMENT = CommandType("comment", False, False, "*COMMENT")
+    INVALID = CommandType("invalid", False, False, "*INVALID")
 
 
 COMMON_NON_VARIABLE_WORDS = [
@@ -92,3 +94,6 @@ KEYWORDS: dict[str, list[str]] = {
         "*line_break",
     ],
 }
+
+
+CONDITION_SYMBOLS = ["(", ")", ">=", "<=", ">", "<", "=", "NOT"]

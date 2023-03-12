@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from cstest.constants import COMMON_NON_VARIABLE_WORDS, KEYWORDS, Commands
+from cstest.content.effect import Effect
 from cstest.content.variable import Variable
 
 
@@ -33,12 +34,12 @@ class Line:
     warnings: dict[str, str] = {}
     indent: int = 0
     clean_line: str = ""
-    line_type: Commands = field(init=False)
+    command_type: Commands = field(init=False)
     called_variables: list[str] = []
     called_bracket_variables: list[str] = []
     created_variable: Optional[Variable] = None
-    # condition
-    # effect
+    # condition: Optional[Condition] = None
+    effect: Optional[Effect] = None
     # next line
 
     def calc_indent(self) -> None:
@@ -49,29 +50,29 @@ class Line:
         """Replace new line characters, remove indent and uppercase"""
         self.clean_line = self.clean_line.replace("\n", "").lstrip().upper()
 
-    def calc_line_type(self) -> None:
+    def calc_command_type(self) -> None:
         """Calculate the type of line (prose, creation, access, comment)
         and store the command type if it is one."""
         command = self.clean_line.split(" ")[0].replace("*", "")
 
         if self.clean_line.startswith("*"):
             try:
-                self.line_type = Commands[command]
+                self.command_type = Commands[command]
             except Exception:
-                self.line_type = Commands["INVALID"]
+                self.command_type = Commands["INVALID"]
                 self.errors[
-                    "line_type"
+                    "command_type"
                 ] = f"Command: {command} is not a valid Choicescript command"
 
         else:
             try:
                 Commands[command]
-                self.warnings["line_type"] = (
+                self.warnings["command_type"] = (
                     f"Starting word {command} might be missing an '*' to make it"
                     "a Choicescript command"
                 )
             except Exception:
-                self.line_type = Commands["PROSE"]
+                self.command_type = Commands["PROSE"]
 
     def find_created_variables(self, string: str) -> None:
         parts = string.split()
@@ -144,6 +145,12 @@ class Line:
         self.find_cmd_call_variables(cmd_string)
         self.find_prose_call_variables(prose_string)
 
+    # def evaluate_condition(self) -> None:
+    #     if self.command_type.value.conditional:
+    #         self.condition = create_condition(
+    #             self.clean_line, self.command_type.value.name
+    #         )
+
     def process_line(self) -> None:
         line_process_dispatcher: dict[str, Callable[[str], None]] = {
             "creation": self.find_created_variables,
@@ -154,8 +161,12 @@ class Line:
 
         self.calc_indent()
         self.create_clean_line()
-        self.calc_line_type()
-        line_process_dispatcher[self.line_type.value.type](self.clean_line)
+        self.calc_command_type()
+        line_process_dispatcher[self.command_type.value.variable_handle_type](
+            self.clean_line
+        )
+        # self.evaluate_condition()
+        # self.calc_effect()
 
 
 @dataclass
