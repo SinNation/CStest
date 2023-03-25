@@ -38,7 +38,7 @@ class Line:
     called_variables: list[str] = []
     called_bracket_variables: list[str] = []
     created_variable: Optional[Variable] = None
-    # condition: Optional[Condition] = None
+    # condition_map: Optional[Condition] = None
     effect: Optional[Effect] = None
     # next line
 

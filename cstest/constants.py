@@ -8,8 +8,24 @@ TIMESTAMP = datetime.now().strftime("%Y%M%d-%H%M%S")
 CS_PATH = Path.cwd()
 DATA_PATH = CS_PATH / "data"
 PROJECTS_PATH = CS_PATH.parents[0]
-
 INVALID_LINE_FILE = "invalid_line.csv"
+
+
+ERRORS = {
+    "invalid_if_params": """*IF statement is incorrectly formed, either containing
+     more than 4, or 0, components for a single condition""",
+}
+
+OPERATORS = ["(", ")", ">=", "<=", ">", "<", "=", "NOT"]
+CONNECTORS = ["AND", "OR"]
+
+
+IF_COMMANDS = {
+    "(": "[",
+    ")": "],",
+    "AND": "'AND',",
+    "OR": "'OR',",
+}
 
 
 @dataclass
@@ -94,6 +110,3 @@ KEYWORDS: dict[str, list[str]] = {
         "*line_break",
     ],
 }
-
-
-CONDITION_SYMBOLS = ["(", ")", ">=", "<=", ">", "<", "=", "NOT"]
