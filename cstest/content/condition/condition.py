@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Tuple
 
 from cstest.constants import CONNECTORS, ERRORS, IF_COMMANDS, OPERATORS
+from cstest.content.condition.params import recode_params, validate_params
 
 
 @dataclass
@@ -13,60 +14,40 @@ class Condition:
 
     variable: str
     operator: str
-    value: Any
-
-
-def create_condition(params: list[str], length: int) -> Condition:
-    """Records parameters into standard form and converts them
-    into a Condition object"""
-    params = recode_params(params, length)
-    return Condition(*params)
+    value: str
 
 
 condition_dict = dict[int, Condition]
 condition_map_type = list[list[Condition]]
 
 
-def identify_single_condition(list_line: list[str]) -> Tuple[condition_dict, str]:
-    params: list[str] = [word for word in list_line if word not in ["(", ")"]]
-    length = len(params)
-    # Too many, or 0, params identified
-    if length not in (1, 2, 3, 4):
-        return {}, ERRORS["invalid_if_params"]
-    return {1: create_condition(params, length)}, ""
-
-
-def recode_params(params: list[str], length: int) -> list[str]:
-    """Returns a list of strings as a standardised parameter set.
-    Length 1 input is a test of truthness (IF {variable})
-    Length 2 input is a test of falseness (IF NOT {variable})
-    Length 3 and 4 input is a test of equality:
-        (IF {variable} = {value}
-         IF {variable} >= {value}
-         IF {vatiable} > = {value})
-    """
-    if length == 1:
-        return [params[0], "boolean", "True"]
-    elif length == 2:
-        return [params[1], "boolean", "False"]
-    elif length == 4:
-        return [params[0], params[1] + params[2], params[3]]
+def create_condition(
+    params: list[str],
+    condition_num: int,
+    string_conditions: condition_dict,
+) -> Tuple[condition_dict, str]:
+    """Standardises parameters and uses them to create Condition object"""
+    length, error = validate_params(params)
+    if error != "":
+        return {}, error
     else:
-        return params
+        string_conditions[condition_num] = Condition(*recode_params(params, length))
+        return string_conditions, ""
 
 
-def identify_multiple_conditions(
+def identify_conditions(
     list_string: list[str],
 ) -> Tuple[condition_dict, str]:
     """Parse a list of strings that comprise a single *IF statement.
     Identify each variable, operator and value that are in each condition.
     Creates a dictionary of all the conditions within the statement."""
     params: list[str] = []
-    string_conditions = {}
+    string_conditions: condition_dict = {}
     condition_num = 1
     is_string = False
     start_string = False
     end_string = False
+    error = ""
 
     for word in list_string:
         # No need to parse brackets. AND and OR identify each new condition
@@ -84,14 +65,11 @@ def identify_multiple_conditions(
 
         # End of a condition, so process it
         if word in CONNECTORS and not is_string:
-            length = len(params)
-            # Too many, or 0, params identified
-            if length not in (1, 2, 3, 4):
-                return {}, ERRORS["invalid_if_params"]
-            else:
-                string_conditions[condition_num] = create_condition(params, length)
-                condition_num += 1
-                params = []  # Reset for next condition
+            string_conditions, error = create_condition(
+                params, condition_num, string_conditions
+            )
+            condition_num += 1
+            params = []  # Reset for next condition
         # Mid-condition, keep appending the word as the next parameter
         else:
             # Word is mid-string, append to last param value to compile full string
@@ -111,17 +89,23 @@ def identify_multiple_conditions(
             params.append(word)
             start_string = False  # Can always be safely turned off
 
+        if error != "":
+            return {}, error
+
     # The last condition won't reach another AND or OR, so process it here
-    length = len(params)
-    # Too many, or 0, params identified
-    if length not in (1, 2, 3, 4):
-        return {}, ERRORS["invalid_if_params"]
-    string_conditions[condition_num] = create_condition(params, length)
+    string_conditions, error = create_condition(
+        params, condition_num, string_conditions
+    )
+    if error != "":
+        return {}, error
+    else:
+        return string_conditions, ""
 
-    return string_conditions, ""
 
-
-def has_sublist(lst: list) -> bool:
+def has_sublist(lst: Any) -> bool:
+    """Identifies if a list contains a list which contains 3 elements.
+    This identifies a case where a list contains an unresolved Condition
+    pair, which needs resolving first"""
     return True if isinstance(lst, list) and len(lst) == 3 else False
 
 
@@ -132,43 +116,88 @@ def extend_list(base_list: list[list[int]], new_value: int) -> list[list[int]]:
 
 
 def parse_condition_element(lst: list[Any]) -> list[list[int]]:
-    print(lst)
+    """Received a list containing 3 elements: 2 conditions and a connector.
+    Neither condition has a sublist, but it could be a list of lists, containing
+    previously resolved Condition pairs from lower in the nested list stack.
+
+    Depending on which Conditions are lists and which are just integers (Conditions)
+    it creates a unified list[list[int]] from both conditions and returns that.
+
+    How the unified list is generated depends on whether the connector is AND or OR"""
+
+    # First Condition pair for entire statement will just be 2 ints - make a list
     if not isinstance(lst[0], list) and not isinstance(lst[2], list):
         return [[lst[0], lst[2]]] if lst[1] == "AND" else [[lst[0]], [lst[2]]]
 
+    # These two are the same, just the list is either on the left or right
+    # Takes the existing list[list[int]] and adds the integer from the other
+    # condition into it and returns it
     elif isinstance(lst[0], list) and not isinstance(lst[2], list):
         if lst[1] == "AND":
             return extend_list(lst[0], lst[2])
+        if lst[1] == "OR":
+            lst[0].append(lst[2])
+            return lst[0]
 
+    elif not isinstance(lst[0], list) and isinstance(lst[2], list):
+        if lst[1] == "AND":
+            return extend_list(lst[2], lst[0])
+        if lst[1] == "OR":
+            lst[2].append(lst[0])
+            return lst[2]
+
+    # Two list[list[int]], picks one and iterates over it. Then unpicks each
+    # element of the other list[list[int]] and adds each constituent integer
+    # into the other list
     elif isinstance(lst[0], list) and isinstance(lst[2], list):
         if lst[1] == "AND":
             for new_list in lst[0]:
                 for lst_2 in lst[2]:
                     new_list.extend(lst_2)
-        return lst[0]
+            return lst[0]
 
-    elif not isinstance(lst[0], list) and isinstance(lst[2], list):
-        if lst[1] == "AND":
-            return extend_list(lst[2], lst[0])
+        if lst[1] == "OR":
+            for lst_2 in lst[2]:
+                lst[0].append(lst_2)
+            return lst[0]
 
     return lst
 
 
-def iterate_list(lst: list[Any], indexer: list[int]) -> Tuple[list[Any], list[int]]:
+def iterate_list(lst: Any, indexer: list[int]) -> Tuple[list[Any], list[int]]:
+    """Hunts for the lowest unresolved Condition pair.
+    Check if the left hand condition has a sublist, if not checks the right
+    hand condition - once it reaches a Condition pair with no sublists, it
+    sends them to be resolved.
+
+    Each list that has a sublist is passed to this function again, in this way
+    it recursively iterates down the nested list stack"""
+
+    # Check left condition
     if has_sublist(lst[0]):
-        indexer.append(0)
-        return iterate_list(lst[0], indexer)
+        indexer.append(0)  # Record which index of the list was used
+        return iterate_list(lst[0], indexer)  # Now check that list
+    # Check right condition
     elif has_sublist(lst[2]):
         indexer.append(2)
         return iterate_list(lst[2], indexer)
-    else:
+    else:  # Found a Condition pair which just contains ints, no sublist
         return parse_condition_element(lst), indexer
 
 
-def unpack_list(lst: list[Any]) -> list[list[int]]:
+def flatten_list(lst: list[str]) -> list[list[int]]:
+    """Iterates over a list of nested lists, flattening out the nested
+    lists until it comprises of a list[list[int]]. This structure
+    represents all the possible Condition combinations."""
+
+    # While either the left or right condition has a sublist
     while has_sublist(lst[0]) or has_sublist(lst[2]):
+        # Recursively hunts for the lowest unresolved Condition pair
         alteration, indexer = iterate_list(lst, [])
 
+        # Create a string containing python syntax to apply the alteration
+        # to the main list, so that it can be passed into the recursive function
+        # The indexer defines which element of the list needs to be changed
         statement = "lst"
         for x in indexer:
             statement += f"[{x}]"
@@ -176,14 +205,47 @@ def unpack_list(lst: list[Any]) -> list[list[int]]:
 
         exec(statement)
 
-        print(f"{alteration = }")
-        print(f"new list: {lst}")
-
     return parse_condition_element(lst)
 
 
+def create_condition_string(list_line: list[str]) -> str:
+    """Creates a string representation of a nested lists from the
+    IF command"""
+    cond_num = 1  # First Condition to be encountered is number 1
+    in_condition = False
+
+    # Recodes the command into a string representation of a python list
+    condition_string = "["
+    for word in list_line:
+        if word in IF_COMMANDS.keys():
+            # Recodes the structure to make it a list
+            condition_string += IF_COMMANDS[word]
+            in_condition = False
+        elif not in_condition:
+            # Every new condition is wholesale replaced by the next integer
+            condition_string += f"{str(cond_num)},"
+            in_condition = True
+            cond_num += 1
+    condition_string += "]"
+
+    return condition_string
+
+
+def map_conditions(
+    conditions: condition_dict, flattened_list: list[list[int]]
+) -> condition_map_type:
+    """Looks up the corresponding Condition object using the integer
+    that was substituted for it and places it back"""
+    condition_map = []
+    for int_list in flattened_list:
+        cond_list = [conditions[x] for x in int_list]
+        condition_map.append(cond_list)
+
+    return condition_map
+
+
 def process_conditions(
-    conditions: condition_dict, list_string: list[str]
+    conditions: condition_dict, list_line: list[str]
 ) -> condition_map_type:
     """Processes the structure of the IF statement. They are comprised of
     Condition pairs (e.g., condition_1 AND condition_2 - where both conditions
@@ -211,33 +273,17 @@ def process_conditions(
     them to be inserted in place of the integers when the list is returned
     """
 
-    cond_num = 1  # First Condition to be encountered is number 1
-    in_condition = False
+    # Create a string representation of the IF command and convert to a python list
+    lst = ast.literal_eval(create_condition_string(list_line))
 
-    # Recodes the command into a string representation of a python list
-    condition_string = "["
-    for word in list_string:
-        if word in IF_COMMANDS.keys():
-            # Recodes the structure to make it a list
-            condition_string += IF_COMMANDS[word]
-            in_condition = False
-        elif not in_condition:
-            # Every new condition is wholesale replaced by the next integer
-            condition_string += f"{str(cond_num)},"
-            in_condition = True
-            cond_num += 1
-    condition_string += "]"
-
-    # Converts the generated string into a python list
-    lst = ast.literal_eval(condition_string)
-
+    # Puts a single Condition IF statemen into a list
     if not has_sublist(lst):
         [lst] = lst
 
-    print(f"Initial list: {lst}")
+    flattened_list = flatten_list(lst)
+    print(flattened_list)
 
-    # return unpack_list(lst)
-    return []
+    return map_conditions(conditions, flattened_list)
 
 
 def pre_process_line(line: str) -> list[str]:
@@ -259,36 +305,9 @@ def create_condition_map(line: str) -> Tuple[condition_map_type, str]:
     can evaluate to true for the entire IF command to evaluate to true."""
     list_line = pre_process_line(line)
 
-    # If not AND or OR are present, there is only a single condition in the command
-    if not any([x in list_line for x in ["AND", "OR"]]):
-        conditions, error = identify_single_condition(list_line)
-    else:
-        conditions, error = identify_multiple_conditions(list_line)
+    conditions, error = identify_conditions(list_line)
 
     condition_map = process_conditions(conditions, list_line)
 
     print(condition_map)
     return condition_map, error
-
-
-strings = [
-    # "(bailey_available or tommy_available) or lopez_available",
-    # "lopez_available or (bailey_available or tommy_available)",
-    # "bailey_available",
-    # "m_medicine >= 50",
-    # "not(gilbert_painkillers)",
-    # "(wil <60) and ((m_survival <50) and not(ptsd))",
-    # "*if with_bailey and (bailey_faction >= 40)",
-    # "*if (group_food < 300) and (group_food > 100)",
-    "*if (curr_weapon = 'compound bow') or (curr_weapon = 'recurve bow')",
-    # "*if (bailey_available or tommy_available) or lopez_available or (cheese_avail or
-    #  bread_avail)",
-    # "*if ((var_1 or var_2 = 20) and var_3 >= 12) or (var_4 = 'lala' and not(var_5))",
-    # "(bailey_available or tommy_available)",
-    # "*if ((((a and (b or c)) and ((d and e) or f)) or (g and h)) or i) and j"
-    # "*if ((((a and (b and c)) and ((d and e) and f)) and (g and h)) and i) and j"
-    # "*if (a and (b and (c and d)))"
-]
-
-for s in strings:
-    create_condition_map(s)
