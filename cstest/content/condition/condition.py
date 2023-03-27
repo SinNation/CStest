@@ -50,43 +50,34 @@ def identify_conditions(
     error = ""
 
     for word in list_string:
-        # No need to parse brackets. AND and OR identify each new condition
-        if word in ["(", ")"]:
+        if word in ["(", ")"]:  # Ignore brackets. AND and OR identify new conditions
             continue
 
-        # Conditions can contain a full string to compare the value against.
-        if word.startswith(("'", '"')):
+        if word.startswith(("'", '"')):  # Manages multi-word string values
             start_string = True
             is_string = True
         if word.endswith(("'", '"')):
             end_string = True
-
         word = word.replace("'", "").replace('"', "")
 
-        # End of a condition, so process it
-        if word in CONNECTORS and not is_string:
+        if word in CONNECTORS and not is_string:  # End of condition found
             string_conditions, error = create_condition(
                 params, condition_num, string_conditions
             )
             condition_num += 1
             params = []  # Reset for next condition
-        # Mid-condition, keep appending the word as the next parameter
-        else:
-            # Word is mid-string, append to last param value to compile full string
-            if is_string and not start_string:
+        else:  # Mid-condition, keep appending the word as the next parameter
+            if is_string and not start_string:  # Word is mid multi word string
                 params[len(params) - 1] = params[len(params) - 1] + " " + word
-                # If is last word in string, then close the string
-                if end_string:
+                if end_string:  # If is last word in string, then close the string
                     is_string = False
                     end_string = False
                 continue
-            # Immediately close the string if it is only one word long
-            if end_string:
+            if end_string:  # Immediately close the string if only one word long
                 is_string = False
                 end_string = False
 
-            # Append any other word, or is the starting word of the string
-            params.append(word)
+            params.append(word)  # Append any other word, or starting word of the string
             start_string = False  # Can always be safely turned off
 
         if error != "":
@@ -96,17 +87,20 @@ def identify_conditions(
     string_conditions, error = create_condition(
         params, condition_num, string_conditions
     )
-    if error != "":
-        return {}, error
-    else:
-        return string_conditions, ""
+    return ({}, error) if error != "" else (string_conditions, "")
 
 
-def has_sublist(lst: Any) -> bool:
-    """Identifies if a list contains a list which contains 3 elements.
+def is_sublist(lst: Any) -> bool:
+    """Identifies if an object is a list containing 3 elements.
     This identifies a case where a list contains an unresolved Condition
     pair, which needs resolving first"""
-    return True if isinstance(lst, list) and len(lst) == 3 else False
+    if isinstance(lst, list) and len(lst) == 3:
+        if lst[1] in CONNECTORS:
+            return True
+        else:
+            return False
+    else:
+        return False
 
 
 def extend_list(base_list: list[list[int]], new_value: int) -> list[list[int]]:
@@ -116,7 +110,7 @@ def extend_list(base_list: list[list[int]], new_value: int) -> list[list[int]]:
 
 
 def parse_condition_element(lst: list[Any]) -> list[list[int]]:
-    """Received a list containing 3 elements: 2 conditions and a connector.
+    """Receives a list containing 3 elements: 2 conditions and a connector.
     Neither condition has a sublist, but it could be a list of lists, containing
     previously resolved Condition pairs from lower in the nested list stack.
 
@@ -136,14 +130,14 @@ def parse_condition_element(lst: list[Any]) -> list[list[int]]:
         if lst[1] == "AND":
             return extend_list(lst[0], lst[2])
         if lst[1] == "OR":
-            lst[0].append(lst[2])
+            lst[0].append([lst[2]])
             return lst[0]
 
     elif not isinstance(lst[0], list) and isinstance(lst[2], list):
         if lst[1] == "AND":
             return extend_list(lst[2], lst[0])
         if lst[1] == "OR":
-            lst[2].append(lst[0])
+            lst[2].append([lst[0]])
             return lst[2]
 
     # Two list[list[int]], picks one and iterates over it. Then unpicks each
@@ -151,10 +145,11 @@ def parse_condition_element(lst: list[Any]) -> list[list[int]]:
     # into the other list
     elif isinstance(lst[0], list) and isinstance(lst[2], list):
         if lst[1] == "AND":
-            for new_list in lst[0]:
+            new_list = []
+            for lst_1 in lst[0]:
                 for lst_2 in lst[2]:
-                    new_list.extend(lst_2)
-            return lst[0]
+                    new_list.append(lst_1 + lst_2)
+            return new_list
 
         if lst[1] == "OR":
             for lst_2 in lst[2]:
@@ -174,11 +169,11 @@ def iterate_list(lst: Any, indexer: list[int]) -> Tuple[list[Any], list[int]]:
     it recursively iterates down the nested list stack"""
 
     # Check left condition
-    if has_sublist(lst[0]):
+    if is_sublist(lst[0]):
         indexer.append(0)  # Record which index of the list was used
         return iterate_list(lst[0], indexer)  # Now check that list
     # Check right condition
-    elif has_sublist(lst[2]):
+    elif is_sublist(lst[2]):
         indexer.append(2)
         return iterate_list(lst[2], indexer)
     else:  # Found a Condition pair which just contains ints, no sublist
@@ -191,7 +186,7 @@ def flatten_list(lst: list[str]) -> list[list[int]]:
     represents all the possible Condition combinations."""
 
     # While either the left or right condition has a sublist
-    while has_sublist(lst[0]) or has_sublist(lst[2]):
+    while is_sublist(lst[0]) or is_sublist(lst[2]):
         # Recursively hunts for the lowest unresolved Condition pair
         alteration, indexer = iterate_list(lst, [])
 
@@ -277,7 +272,7 @@ def process_conditions(
     lst = ast.literal_eval(create_condition_string(list_line))
 
     # Puts a single Condition IF statemen into a list
-    if not has_sublist(lst):
+    if not is_sublist(lst):
         [lst] = lst
 
     flattened_list = flatten_list(lst)
