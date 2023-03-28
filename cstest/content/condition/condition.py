@@ -1,3 +1,5 @@
+#   BRACKET VARIABLES
+
 from __future__ import annotations
 
 import ast
@@ -94,13 +96,11 @@ def is_sublist(lst: Any) -> bool:
     """Identifies if an object is a list containing 3 elements.
     This identifies a case where a list contains an unresolved Condition
     pair, which needs resolving first"""
-    if isinstance(lst, list) and len(lst) == 3:
-        if lst[1] in CONNECTORS:
-            return True
-        else:
-            return False
-    else:
-        return False
+    if isinstance(lst, list):
+        if len(lst) == 3:
+            if lst[1] in CONNECTORS:
+                return True
+    return False
 
 
 def extend_list(base_list: list[list[int]], new_value: int) -> list[list[int]]:
@@ -276,7 +276,6 @@ def process_conditions(
         [lst] = lst
 
     flattened_list = flatten_list(lst)
-    print(flattened_list)
 
     return map_conditions(conditions, flattened_list)
 
@@ -304,5 +303,4 @@ def create_condition_map(line: str) -> Tuple[condition_map_type, str]:
 
     condition_map = process_conditions(conditions, list_line)
 
-    print(condition_map)
     return condition_map, error

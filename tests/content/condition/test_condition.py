@@ -257,3 +257,77 @@ def test_extend_list(
 )
 def test_parse_condition_element(in_list: list[Any], out_list: list[Any]) -> None:
     assert c.parse_condition_element(in_list) == out_list
+
+
+@pytest.mark.parametrize(
+    "lst, exp_alteration, exp_indexer",
+    [
+        ([1, "AND", 2], [[1, 2]], []),
+        ([[1, "OR", 2], "AND", 3], [[1], [2]], [0]),
+        ([[[1, "AND", 4], "OR", 2], "AND", 3], [[1, 4]], [0, 0]),
+        ([[[[1, "OR", 5], "AND", 4], "OR", 2], "AND", 3], [[1], [5]], [0, 0, 0]),
+        ([[1, "OR", [2, "OR", 4]], "AND", 3], [[2], [4]], [0, 2]),
+        ([[1, "OR", [[2, "AND", 5], "OR", 4]], "AND", 3], [[2, 5]], [0, 2, 0]),
+        ([1, "AND", [2, "OR", 3]], [[2], [3]], [2]),
+        ([1, "AND", [[2, "AND", 4], "OR", 3]], [[2, 4]], [2, 0]),
+        ([1, "AND", [2, "AND", [[4, "AND", 5], "OR", 3]]], [[4, 5]], [2, 2, 0]),
+        (
+            [1, "AND", [2, "AND", [[[4, "OR", 6], "AND", 5], "OR", 3]]],
+            [[4], [6]],
+            [2, 2, 0, 0],
+        ),
+    ],
+)
+def test_iterate_list(
+    lst: list[Any], exp_alteration: list[list[int]], exp_indexer: list[int]
+) -> None:
+    alteration, indexer = c.iterate_list(lst, [])
+    assert alteration == exp_alteration and indexer == exp_indexer
+
+
+@pytest.mark.parametrize(
+    "lst, exp_output",
+    [
+        ([1, "AND", 2], [[1, 2]]),
+        ([1, "OR", 2], [[1], [2]]),
+        ([[[1, "AND", 2]], "AND", 3], [[1, 2, 3]]),
+        ([[[1, "AND", 2]], "OR", 3], [[1, 2], [3]]),
+        ([[[1, "OR", 2]], "AND", 3], [[1, 3], [2, 3]]),
+        ([[[1, "OR", 2]], "OR", 3], [[1], [2], [3]]),
+        ([[[1, "OR", 2]], "AND", [3, "AND", 4]], [[1, 3, 4], [2, 3, 4]]),
+        ([[[1, "AND", 2]], "AND", [3, "OR", 4]], [[1, 2, 3], [1, 2, 4]]),
+        ([[[1, "OR", 2]], "OR", [3, "OR", 4]], [[1], [2], [3], [4]]),
+        (
+            [[1, "OR", [2, "AND", 5]], "AND", [3, "AND", [4, "OR", 6]]],
+            [[1, 3, 4], [2, 5, 3, 4], [1, 3, 6], [2, 5, 3, 6]],
+        ),
+        (
+            [[[[1, "AND", 5], "OR", 2]], "AND", [[3, "OR", 6], "AND", 4]],
+            [[1, 5, 3, 4], [2, 3, 4], [1, 5, 6, 4], [2, 6, 4]],
+        ),
+        (
+            [[[[1, "AND", 5], "OR", [2, "OR", 6]]], "AND", [[3, "OR", 7], "AND", 4]],
+            [[1, 5, 3, 4], [2, 3, 4], [6, 3, 4], [1, 5, 7, 4], [2, 7, 4], [6, 7, 4]],
+        ),
+        (
+            [
+                [1, "AND", [[2, "OR", 3], "OR", 4]],
+                "AND",
+                [5, "AND", [6, "OR", 7]],
+                "OR",
+                8,
+            ],
+            [
+                [1, 2, 5, 7],
+                [1, 3, 5, 7],
+                [1, 4, 5, 7],
+                [1, 2, 5, 7],
+                [1, 3, 5, 7],
+                [1, 4, 5, 7],
+                [8],
+            ],
+        ),
+    ],
+)
+def test_flatten_list(lst: list[Any], exp_output: list[Any]) -> None:
+    assert c.flatten_list(lst) == exp_output
