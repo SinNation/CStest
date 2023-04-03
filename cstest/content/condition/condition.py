@@ -103,6 +103,23 @@ def is_sublist(lst: Any) -> bool:
     return False
 
 
+def is_empty_list(lst: Any) -> bool:
+    """Identifies if an object is a lst containing nothing but
+    another list"""
+    if isinstance(lst, list):  # Is a list
+        if len(lst) == 1:  # Has one element - not a Condition pair or list of ints
+            if isinstance(lst[0], list):  # That element is a list
+                if len(lst[0]) == 1:  # Contains single Condition
+                    return True
+                elif lst[0][1] in CONNECTORS:  # Conrains a Condition pair
+                    return True
+                else:  # Will then be a list of ints, i.e., processed Conditions
+                    return False
+            else:  # If not a list, must be a list wrapping a single Condition
+                return True
+    return False
+
+
 def extend_list(base_list: list[list[int]], new_value: int) -> list[list[int]]:
     for item in base_list:
         item.extend([new_value])
@@ -167,9 +184,13 @@ def iterate_list(lst: Any, indexer: list[int]) -> Tuple[list[Any], list[int]]:
 
     Each list that has a sublist is passed to this function again, in this way
     it recursively iterates down the nested list stack"""
-
-    # Check left condition
-    if is_sublist(lst[0]):
+    if is_empty_list(lst[0]):
+        indexer.append(0)
+        return lst[0][0], indexer
+    elif is_empty_list(lst[2]):
+        indexer.append(2)
+        return lst[2][0], indexer
+    elif is_sublist(lst[0]):
         indexer.append(0)  # Record which index of the list was used
         return iterate_list(lst[0], indexer)  # Now check that list
     # Check right condition
@@ -180,10 +201,13 @@ def iterate_list(lst: Any, indexer: list[int]) -> Tuple[list[Any], list[int]]:
         return parse_condition_element(lst), indexer
 
 
-def flatten_list(lst: list[str]) -> list[list[int]]:
+def flatten_list(lst: list[Any]) -> list[list[int]]:
     """Iterates over a list of nested lists, flattening out the nested
     lists until it comprises of a list[list[int]]. This structure
     represents all the possible Condition combinations."""
+
+    while is_empty_list(lst):
+        lst = lst[0]
 
     # While either the left or right condition has a sublist
     while is_sublist(lst[0]) or is_sublist(lst[2]):
@@ -271,11 +295,11 @@ def process_conditions(
     # Create a string representation of the IF command and convert to a python list
     lst = ast.literal_eval(create_condition_string(list_line))
 
-    # Puts a single Condition IF statemen into a list
-    if not is_sublist(lst):
-        [lst] = lst
-
-    flattened_list = flatten_list(lst)
+    # Puts a single Condition IF statement into a list
+    if is_sublist(lst):
+        flattened_list = flatten_list(lst)
+    else:
+        flattened_list = [[lst]]
 
     return map_conditions(conditions, flattened_list)
 

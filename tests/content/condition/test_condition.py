@@ -14,6 +14,8 @@ from cstest.content.condition import condition as c
         (["VAR", "=", "20"], {1: c.Condition("VAR", "=", "20")}),
         (["VAR", ">", "30"], {1: c.Condition("VAR", ">", "30")}),
         (["VAR", ">", "=", "40"], {1: c.Condition("VAR", ">=", "40")}),
+        (["VAR", "!=", "30"], {1: c.Condition("VAR", "!=", "30")}),
+        (["VAR", "!", "=", "40"], {1: c.Condition("VAR", "!=", "40")}),
         (["VAR", "<=", "50"], {1: c.Condition("VAR", "<=", "50")}),
         (["VAR", "=", "A B C"], {1: c.Condition("VAR", "=", "A B C")}),
         ([], {}),
@@ -36,6 +38,8 @@ def test_create_condition(params: list[str], result: c.condition_dict) -> None:
         (["VAR", "=", "20"], {1: c.Condition("VAR", "=", "20")}, ""),
         (["VAR", ">", "30"], {1: c.Condition("VAR", ">", "30")}, ""),
         (["VAR", ">", "=", "40"], {1: c.Condition("VAR", ">=", "40")}, ""),
+        (["VAR", "!=", "30"], {1: c.Condition("VAR", "!=", "30")}, ""),
+        (["VAR", "!", "=", "40"], {1: c.Condition("VAR", "!=", "40")}, ""),
         (["VAR", "<=", "50"], {1: c.Condition("VAR", "<=", "50")}, ""),
         (["(", "VAR", "<=", "50", ")"], {1: c.Condition("VAR", "<=", "50")}, ""),
         (
@@ -209,6 +213,28 @@ def test_is_sublist(lst: Any, result: bool) -> None:
 
 
 @pytest.mark.parametrize(
+    "lst, result",
+    [
+        ("", False),
+        (2, False),
+        (True, False),
+        ([1, "AND", 2], False),
+        ([2, "OR", [3, "AND", 4]], False),
+        ([[1, 2]], False),
+        ([[1], [2]], False),
+        ([[1, 2, 3], [4, 5]], False),
+        ([1], True),
+        ([[1]], True),
+        ([[3, "OR", 4]], True),
+        ([[[[1]]]], True),
+        ([[[[[3, "OR", 4]]]]], True),
+    ],
+)
+def test_is_empty_list(lst: list[Any], result: bool) -> None:
+    assert c.is_empty_list(lst) == result
+
+
+@pytest.mark.parametrize(
     "lst, value, exp_result",
     [
         ([[1, 2]], 3, [[1, 2, 3]]),
@@ -283,6 +309,30 @@ def test_parse_condition_element(in_list: list[Any], out_list: list[Any]) -> Non
             [[4], [6]],
             [2, 2, 0, 0],
         ),
+        (
+            [[1, "OR", [[[2, "AND", 5]], "OR", 4]], "AND", 3],
+            [2, "AND", 5],
+            [0, 2, 0],
+        ),
+        (
+            [[[[[[1]], "OR", 5], "AND", 4], "OR", 2], "AND", [3, "OR", 4]],
+            [1],
+            [0, 0, 0, 0],
+        ),
+        (
+            [
+                [[[[[1, "AND", 10]], "OR", 5], "AND", 4], "OR", 2],
+                "AND",
+                [3, "OR", [[4, "OR", 10]]],
+            ],
+            [1, "AND", 10],
+            [0, 0, 0, 0],
+        ),
+        (
+            [[1, "OR", [[[2, "AND", [[5, "OR", 7]]]], "OR", 4]], "AND", 3],
+            [2, "AND", [[5, "OR", 7]]],
+            [0, 2, 0],
+        ),
     ],
 )
 def test_iterate_list(
@@ -295,9 +345,8 @@ def test_iterate_list(
 @pytest.mark.parametrize(
     "lst, exp_output",
     [
-        ([1], [[1]]),
         ([1, "AND", 2], [[1, 2]]),
-        ([[1, "AND", 2]], [[1, 2]]),
+        ([[1, "AND", 2]], [[1, 2]]),  # Redundant bracket around top level
         ([1, "OR", 2], [[1], [2]]),
         ([[1, "AND", 2], "AND", 3], [[1, 2, 3]]),
         ([[1, "AND", 2], "OR", 3], [[1, 2], [3]]),
@@ -309,6 +358,14 @@ def test_iterate_list(
         (
             [[1, "OR", [2, "AND", 5]], "AND", [3, "AND", [4, "OR", 6]]],
             [[2, 5, 4, 3], [2, 5, 6, 3], [1, 4, 3], [1, 6, 3]],
+        ),
+        (  # Two redundant brackets around single Condition
+            [[1, "OR", [2, "AND", [[50]]]], "AND", [3, "AND", [4, "OR", 6]]],
+            [[2, 50, 4, 3], [2, 50, 6, 3], [1, 4, 3], [1, 6, 3]],
+        ),
+        (  # Redundant brackets around two nested conditions
+            [[1, "OR", [[2, "AND", 55]]], "AND", [3, "AND", [[4, "OR", 65]]]],
+            [[2, 55, 4, 3], [2, 55, 65, 3], [1, 4, 3], [1, 65, 3]],
         ),
         (
             [[[1, "AND", 5], "OR", 2], "AND", [[3, "OR", 6], "AND", 4]],
@@ -334,36 +391,107 @@ def test_iterate_list(
                 [8],
             ],
         ),
+        (  # Redundant brackets around nested condition with nested condition
+            [
+                [
+                    [1, "AND", [[[2, "OR", 3], "OR", 4]]],
+                    "AND",
+                    [5, "AND", [6, "OR", 7]],
+                ],
+                "OR",
+                8,
+            ],
+            [
+                [2, 1, 6, 5],
+                [2, 1, 7, 5],
+                [3, 1, 6, 5],
+                [3, 1, 7, 5],
+                [4, 1, 6, 5],
+                [4, 1, 7, 5],
+                [8],
+            ],
+        ),
     ],
 )
 def test_flatten_list(lst: list[Any], exp_output: list[Any]) -> None:
     assert c.flatten_list(lst) == exp_output
 
 
-# @pytest.mark.parametrize(
-#     "lst, exp_output",
-#     [
-#         (["(", "var_a", "and", "var_b", "=", "20", ")"], [1, "AND", 2]),
-#         (["(", "not", "var_a", "OR", "var_2", ">=", "30", ")"],[1, "OR", 2]),
-#         ([[1, "AND", 2], "AND", 3]),
-#         ([[1, "AND", 2], "OR", 3]),
-#         ([[1, "OR", 2], "AND", 3]),
-#         ([[1, "OR", 2], "OR", 3]),
-#         ([[1, "OR", 2], "AND", [3, "AND", 4]]),
-#         ([[1, "AND", 2], "AND", [3, "OR", 4]]),
-#         ([[1, "OR", 2], "OR", [3, "OR", 4]]),
-#         (
-#             [[1, "OR", [2, "AND", 5]], "AND", [3, "AND", [4, "OR", 6]]]),
-#         (
-#             [[[1, "AND", 5], "OR", 2], "AND", [[3, "OR", 6], "AND", 4]]),
-#         (
-#             [[[1, "AND", 5], "OR", [2, "OR", 6]], "AND", [[3, "OR", 7], "AND", 4]]),
-#         (
-#             [
-#                 [[1, "AND", [[2, "OR", 3], "OR", 4]], "AND",
-#                 [5, "AND", [6, "OR", 7]]],
-#                 "OR",
-#                 8,
-#             ]),
-#     ]
-# def test_create_condition_string() -> None:
+@pytest.mark.parametrize(
+    "lst, exp_output",
+    [
+        (["VAR_A"], "[1,]"),
+        (["not", "VAR_A"], "[1,]"),
+        (["VAR_A", "=", "20"], "[1,]"),
+        (["VAR_A", ">", "=", "50"], "[1,]"),
+        (["VAR_B", "=", "A long string"], "[1,]"),
+        (["(", "VAR_A", "=", "20", ")"], "[[1,],]"),
+        (["(", "(", "VAR_A", "=", "20", ")", ")"], "[[[1,],],]"),
+        (["(", "VAR_A", "and", "VAR_B", "=", "20", ")"], "[[1, 'AND', 2,],]"),
+        (
+            ["(", "(", "VAR_A", "and", "VAR_B", "=", "20", ")", ")"],
+            "[[[1, 'AND', 2,],],]",
+        ),
+        (
+            ["(", "(", "(", "VAR_A", ")", ")", "and", "VAR_B", "=", "20", ")"],
+            "[[[[1,],], 'AND', 2,],]",
+        ),
+        (["(", "not", "VAR_A", "OR", "var_2", ">=", "30", ")"], "[[1, 'OR', 2],]"),
+        (
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
+            "[[[1, 'AND', 2, ], 'AND', ],]",
+        ),
+        (
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "OR", "VAR_C", ")"],
+            "[[[1, 'AND', 2, ], 'OR', ],]",
+        ),
+        (
+            ["(", "(", "VAR_A", "OR", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
+            "[[[1, 'OR', 2, ], 'AND', ],]",
+        ),
+        (
+            [
+                "(",
+                "(",
+                "VAR_A",
+                "AND",
+                "(",
+                "(",
+                "VAR_B",
+                ">=",
+                "45",
+                "OR",
+                "NOT",
+                "VAR_C",
+                ")",
+                "OR",
+                "VAR_D",
+                "=",
+                "A STRING",
+                ")",
+                ")",
+                "AND",
+                "(",
+                "VAR_E",
+                "AND",
+                "(",
+                "VAR_F",
+                "OR",
+                "VAR_G",
+                "!",
+                "=",
+                "STRING",
+                ")",
+                ")",
+                ")",
+                "OR",
+                "VAR_H",
+                ")",
+            ],
+            """[[[1, 'AND', [[2, 'OR', 3,], 'OR', 4,], ],], 'AND',
+             [5, 'AND', [6, 'OR', 7,],],], 'OR', 8]]""",
+        ),
+    ],
+)
+def test_create_condition_string(lst: list[Any], exp_output: str) -> None:
+    assert c.create_condition_string(lst) == exp_output
