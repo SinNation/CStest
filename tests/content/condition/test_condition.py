@@ -421,33 +421,33 @@ def test_flatten_list(lst: list[Any], exp_output: list[Any]) -> None:
     "lst, exp_output",
     [
         (["VAR_A"], "[1,]"),
-        (["not", "VAR_A"], "[1,]"),
+        (["NOT", "VAR_A"], "[1,]"),
         (["VAR_A", "=", "20"], "[1,]"),
         (["VAR_A", ">", "=", "50"], "[1,]"),
-        (["VAR_B", "=", "A long string"], "[1,]"),
+        (["VAR_B", "=", "A LONG STRING"], "[1,]"),
         (["(", "VAR_A", "=", "20", ")"], "[[1,],]"),
         (["(", "(", "VAR_A", "=", "20", ")", ")"], "[[[1,],],]"),
-        (["(", "VAR_A", "and", "VAR_B", "=", "20", ")"], "[[1, 'AND', 2,],]"),
+        (["(", "VAR_A", "AND", "VAR_B", "=", "20", ")"], "[[1,'AND',2,],]"),
         (
-            ["(", "(", "VAR_A", "and", "VAR_B", "=", "20", ")", ")"],
-            "[[[1, 'AND', 2,],],]",
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "20", ")", ")"],
+            "[[[1,'AND',2,],],]",
         ),
         (
-            ["(", "(", "(", "VAR_A", ")", ")", "and", "VAR_B", "=", "20", ")"],
-            "[[[[1,],], 'AND', 2,],]",
+            ["(", "(", "(", "VAR_A", ")", ")", "AND", "VAR_B", "=", "20", ")"],
+            "[[[[1,],],'AND',2,],]",
         ),
-        (["(", "not", "VAR_A", "OR", "var_2", ">=", "30", ")"], "[[1, 'OR', 2],]"),
+        (["(", "not", "VAR_A", "OR", "var_2", ">=", "30", ")"], "[[1,'OR',2,],]"),
         (
             ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
-            "[[[1, 'AND', 2, ], 'AND', ],]",
+            "[[[1,'AND',2,],'AND',3,],]",
         ),
         (
             ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "OR", "VAR_C", ")"],
-            "[[[1, 'AND', 2, ], 'OR', ],]",
+            "[[[1,'AND',2,],'OR',3,],]",
         ),
         (
             ["(", "(", "VAR_A", "OR", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
-            "[[[1, 'OR', 2, ], 'AND', ],]",
+            "[[[1,'OR',2,],'AND',3,],]",
         ),
         (
             [
@@ -488,10 +488,72 @@ def test_flatten_list(lst: list[Any], exp_output: list[Any]) -> None:
                 "VAR_H",
                 ")",
             ],
-            """[[[1, 'AND', [[2, 'OR', 3,], 'OR', 4,], ],], 'AND',
-             [5, 'AND', [6, 'OR', 7,],],], 'OR', 8]]""",
+            "[[[1,'AND',[[2,'OR',3,],'OR',4,],],'AND',"
+            "[5,'AND',[6,'OR',7,],],],'OR',8,],]",
         ),
     ],
 )
 def test_create_condition_string(lst: list[Any], exp_output: str) -> None:
     assert c.create_condition_string(lst) == exp_output
+
+
+@pytest.mark.parametrize(
+    "cond_dict, lst, output",
+    [
+        (
+            {
+                1: c.Condition("A", "=", "20"),
+                2: c.Condition("A", "=", "30"),
+                3: c.Condition("A", "=", "40"),
+            },
+            [[1, 2, 3]],
+            [
+                [
+                    c.Condition("A", "=", "20"),
+                    c.Condition("A", "=", "30"),
+                    c.Condition("A", "=", "40"),
+                ]
+            ],
+        ),
+        (
+            {
+                1: c.Condition("A", "=", "20"),
+                2: c.Condition("A", "=", "30"),
+                3: c.Condition("A", "=", "40"),
+            },
+            [[1], [2, 3]],
+            [
+                [
+                    c.Condition("A", "=", "20"),
+                ],
+                [
+                    c.Condition("A", "=", "30"),
+                    c.Condition("A", "=", "40"),
+                ],
+            ],
+        ),
+        (
+            {
+                1: c.Condition("A", "=", "20"),
+                2: c.Condition("A", "=", "30"),
+                3: c.Condition("A", "=", "40"),
+            },
+            [[1], [2], [3]],
+            [
+                [
+                    c.Condition("A", "=", "20"),
+                ],
+                [
+                    c.Condition("A", "=", "30"),
+                ],
+                [
+                    c.Condition("A", "=", "40"),
+                ],
+            ],
+        ),
+    ],
+)
+def test_map_conditions(
+    cond_dict: c.condition_dict, lst: list[list[int]], output: list[list[c.Condition]]
+) -> None:
+    assert c.map_conditions(cond_dict, lst) == output

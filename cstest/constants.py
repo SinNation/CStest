@@ -26,7 +26,7 @@ ERRORS = {
     "if_double_value": "*IF statement has two arguments passed for the value component",
 }
 
-OPERATORS = ["(", ")", ">=", "<=", ">", "<", "=", "!=", "NOT"]
+OPERATORS = ["(", ")", ">=", "<=", ">", "<", "=", "!=", "!", "NOT"]
 CONNECTORS = ["AND", "OR"]
 
 
