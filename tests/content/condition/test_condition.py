@@ -436,7 +436,7 @@ def test_flatten_list(lst: list[Any], exp_output: list[Any]) -> None:
             ["(", "(", "(", "VAR_A", ")", ")", "AND", "VAR_B", "=", "20", ")"],
             "[[[[1,],],'AND',2,],]",
         ),
-        (["(", "not", "VAR_A", "OR", "var_2", ">=", "30", ")"], "[[1,'OR',2,],]"),
+        (["(", "not", "VAR_A", "OR", "VAR_2", ">=", "30", ")"], "[[1,'OR',2,],]"),
         (
             ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
             "[[[1,'AND',2,],'AND',3,],]",
@@ -557,3 +557,171 @@ def test_map_conditions(
     cond_dict: c.condition_dict, lst: list[list[int]], output: list[list[c.Condition]]
 ) -> None:
     assert c.map_conditions(cond_dict, lst) == output
+
+
+@pytest.mark.parametrize(
+    "list_line, exp_cond_map",
+    [
+        (["VAR_A"], [[c.Condition("VAR_A", "boolean", "True")]]),
+        (["NOT", "VAR_A"], [[c.Condition("VAR_A", "boolean", "False")]]),
+        (["VAR_A", "=", "20"], [[c.Condition("VAR_A", "=", "20")]]),
+        (["VAR_A", ">", "=", "50"], [[c.Condition("VAR_A", ">=", "50")]]),
+        (
+            ["VAR_B", "=", "A LONG STRING"],
+            [[c.Condition("VAR_B", "=", "A LONG STRING")]],
+        ),
+        (["(", "VAR_A", "=", "20", ")"], [[c.Condition("VAR_A", "=", "20")]]),
+        (["(", "(", "VAR_A", "=", "20", ")", ")"], [[c.Condition("VAR_A", "=", "20")]]),
+        (
+            ["(", "VAR_A", "AND", "VAR_B", "=", "20", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", "=", "20"),
+                ]
+            ],
+        ),
+        (
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "20", ")", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", "=", "20"),
+                ]
+            ],
+        ),
+        (
+            ["(", "(", "(", "VAR_A", ")", ")", "AND", "VAR_B", "=", "20", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", "=", "20"),
+                ]
+            ],
+        ),
+        (
+            ["(", "not", "VAR_A", "OR", "VAR_2", ">=", "30", ")"],
+            [
+                [c.Condition("VAR_A", "boolean", "False")],
+                [c.Condition("VAR_2", ">=", "30")],
+            ],
+        ),
+        (
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", "=", "12"),
+                    c.Condition("VAR_C", "boolean", "True"),
+                ]
+            ],
+        ),
+        (
+            ["(", "(", "VAR_A", "AND", "VAR_B", "=", "12", ")", "OR", "VAR_C", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", "=", "12"),
+                ],
+                [c.Condition("VAR_C", "boolean", "True")],
+            ],
+        ),
+        (
+            ["(", "(", "VAR_A", "OR", "VAR_B", "=", "12", ")", "AND", "VAR_C", ")"],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_C", "boolean", "True"),
+                ],
+                [
+                    c.Condition("VAR_B", "=", "12"),
+                    c.Condition("VAR_C", "boolean", "True"),
+                ],
+            ],
+        ),
+        (
+            [
+                "(",
+                "(",
+                "VAR_A",
+                "AND",
+                "(",
+                "(",
+                "VAR_B",
+                ">=",
+                "45",
+                "OR",
+                "NOT",
+                "VAR_C",
+                ")",
+                "OR",
+                "VAR_D",
+                "=",
+                "A STRING",
+                ")",
+                ")",
+                "AND",
+                "(",
+                "VAR_E",
+                "AND",
+                "(",
+                "VAR_F",
+                "OR",
+                "VAR_G",
+                "!",
+                "=",
+                "STRING",
+                ")",
+                ")",
+                ")",
+                "OR",
+                "VAR_H",
+                ")",
+            ],
+            [
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", ">=", "45"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_F", "boolean", "True"),
+                ],
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_C", "boolean", "False"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_F", "boolean", "True"),
+                ],
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_D", "=", "A STRING"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_F", "boolean", "True"),
+                ],
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_B", ">=", "45"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_G", "!=", "STRING"),
+                ],
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_C", "boolean", "False"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_G", "!=", "STRING"),
+                ],
+                [
+                    c.Condition("VAR_A", "boolean", "True"),
+                    c.Condition("VAR_D", "=", "A STRING"),
+                    c.Condition("VAR_E", "boolean", "True"),
+                    c.Condition("VAR_G", "!=", "STRING"),
+                ],
+                [c.Condition("VAR_H", "boolean", "True")],
+            ],
+        ),
+    ],
+)
+def test_process_conditions(
+    list_line: list[str], exp_cond_map: c.condition_map_type
+) -> None:
+    pass
+    # assert c.process_conditions(list_line) == exp_cond_map

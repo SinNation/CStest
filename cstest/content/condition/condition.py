@@ -255,7 +255,7 @@ def map_conditions(
 ) -> condition_map_type:
     """Looks up the corresponding Condition object using the integer
     that was substituted for it and places it back"""
-    condition_map = []
+    condition_map: condition_map_type = []
     for int_list in flattened_list:
         cond_list = [conditions[x] for x in int_list]
         condition_map.append(cond_list)
