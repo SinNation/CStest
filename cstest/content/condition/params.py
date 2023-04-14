@@ -17,9 +17,7 @@ def is_num(param: Any) -> bool:
             return False
 
 
-def validate_params(params: list[str]) -> Tuple[int, str]:
-    length = len(params)
-
+def validate_params(params: list[str], length: int) -> Tuple[int, str]:
     if length not in (1, 2, 3, 4):
         error = ERRORS["if_param_count"]
     elif length == 1:
@@ -65,7 +63,7 @@ def recode_params(params: list[str], length: int) -> list[str]:
     Length 3 and 4 input is a test of equality:
         (IF {variable} = {value}
          IF {variable} >= {value}
-         IF {vatiable} > = {value})
+         IF {variable} > = {value})
     """
     if length == 1:
         return [params[0], "boolean", "True"]
