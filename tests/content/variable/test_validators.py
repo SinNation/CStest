@@ -46,10 +46,18 @@ def test_inv_symbol(word: str, exp_outcome: bool) -> None:
 @pytest.mark.parametrize(
     "word, exp_outcome, exp_error",
     [
-        ("word", True, ""),
-        ("valid_variable[name]", True, ""),
-        ("1name", False, "Variable name must start with a letter. Variable: 1name"),
-        ("Wo=rd", False, "Variable contains an invalid symbol. Variable: Wo=rd"),
+        ("word", True, []),
+        ("valid_variable[name]", True, []),
+        ("1name", False, ["Variable name must start with a letter. Variable: 1name"]),
+        ("Wo=rd", False, ["Variable contains an invalid symbol. Variable: Wo=rd"]),
+        (
+            "1Wo=rd",
+            False,
+            [
+                "Variable name must start with a letter. Variable: 1Wo=rd",
+                "Variable contains an invalid symbol. Variable: 1Wo=rd",
+            ],
+        ),
     ],
 )
 def test_validate_variable_word(word: str, exp_outcome: bool, exp_error: str) -> None:
@@ -60,13 +68,13 @@ def test_validate_variable_word(word: str, exp_outcome: bool, exp_error: str) ->
 @pytest.mark.parametrize(
     "variables, exp_outcome",
     [
-        (["[", "word", "]"], True),
-        (["[", "word", "]", "["], False),
-        (["[", "]", "word", "]", "["], True),
-        (["[", "]", "]", "]"], False),
-        (["[", "word", "]", "word]"], False),
-        (["[", "[word]", "]"], True),
+        ("[word]", True),
+        ("[word][", False),
+        ("[]word][", True),
+        ("[]]]", False),
+        ("[word]word]", False),
+        ("[[word]]", True),
     ],
 )
-def test_equal_sq_brackets(variables: list[str], exp_outcome: bool) -> None:
+def test_equal_sq_brackets(variables: str, exp_outcome: bool) -> None:
     assert v.equal_sq_brackets(variables) == exp_outcome

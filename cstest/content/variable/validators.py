@@ -47,29 +47,23 @@ def inv_symbol(word: str) -> bool:
     return True if not [sym for sym in INVALID_VAR_SYMBOLS if sym in word] else False
 
 
-def validate_variable_word(word: str) -> tuple[bool, str]:
+def validate_variable_word(word: str) -> tuple[bool, list[str]]:
     """Checks the variable name passes all required checks"""
-    if is_first_alpha(word):
-        if inv_symbol(word):
-            return True, ""
-        else:
-            return False, var_error_string("inv_symbol", word)
-    else:
-        return False, var_error_string("first_alpha", word)
+    errors: list = []
+    if not is_first_alpha(word):
+        errors.append(var_error_string("first_alpha", word))
+    if not inv_symbol(word):
+        errors.append(var_error_string("inv_symbol", word))
+
+    return (True, errors) if not errors else (False, errors)
 
 
-def equal_sq_brackets(variables: list[str]) -> bool:
+def equal_sq_brackets(int_name: str) -> bool:
     """Checks the full variable name has an equal number
     of open and closed square brackets"""
-    return (
-        True
-        if sum("[" in word for word in variables)
-        == sum("]" in word for word in variables)
-        else False
-    )
+    return True if int_name.count("[") == int_name.count("]") else False
 
 
-def validate_variable_name(
-    name: str, def_variables: dict[str, DefinedVariable]
-) -> bool:
-    return True if name in def_variables.keys() else False
+def is_defined_variable(name: str, def_variables: list[str]) -> bool:
+    """Checks that the called variable name is defined in the game"""
+    return True if name in def_variables else False
