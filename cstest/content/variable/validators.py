@@ -35,33 +35,40 @@ INVALID_VAR_SYMBOLS = [
 ]
 
 
-def is_first_alpha(word: str) -> bool:
-    """Checks the variable name begins with an alpha character"""
-    if word == "" or str(word).isspace():
+def empty_variable_name(name: str) -> None:
+    if name == "" or str(name).isspace():
         raise NoVariableNameValue("Error in CStest: Identified variable name is blank")
-    return True if str(word)[0].isalpha() else False
 
 
-def inv_symbol(word: str) -> bool:
+def is_first_alpha(name: str) -> bool:
+    """Checks the variable name begins with an alpha character"""
+    return True if str(name)[0].isalpha() else False
+
+
+def inv_symbol(name: str) -> bool:
     """Checks the variable name doesn't contain an invalid symbol"""
-    return True if not [sym for sym in INVALID_VAR_SYMBOLS if sym in word] else False
+    return True if not [sym for sym in INVALID_VAR_SYMBOLS if sym in name] else False
 
 
-def validate_variable_word(word: str) -> tuple[bool, list[str]]:
+def validate_variable_name(name: str) -> list[str]:
     """Checks the variable name passes all required checks"""
     errors: list = []
-    if not is_first_alpha(word):
-        errors.append(var_error_string("first_alpha", word))
-    if not inv_symbol(word):
-        errors.append(var_error_string("inv_symbol", word))
+    if not is_first_alpha(name):
+        errors.append(var_error_string("first_alpha", name))
+    if not inv_symbol(name):
+        errors.append(var_error_string("inv_symbol", name))
 
-    return (True, errors) if not errors else (False, errors)
+    return errors
 
 
-def equal_sq_brackets(int_name: str) -> bool:
-    """Checks the full variable name has an equal number
+def first_char_sq_bracket(name: str) -> bool:
+    return True if name[0] == "[" else False
+
+
+def equal_sq_brackets(name: str) -> bool:
+    """Checks the full variable name has an  equal number
     of open and closed square brackets"""
-    return True if int_name.count("[") == int_name.count("]") else False
+    return True if name.count("[") == name.count("]") else False
 
 
 def is_defined_variable(name: str, def_variables: list[str]) -> bool:
