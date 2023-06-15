@@ -24,6 +24,9 @@ def_variables = ["var1", "var2", "var3"]
             v.ResolveBracketVariable("[variable][name]"),
             ["", "variable]", "name]"],
         ),
+        (v.ResolveHashVariable("variable[name]#1"), ["variable[name]", "1"]),
+        (v.ResolveHashVariable("var#12"), ["var", "12"]),
+        (v.ResolveHashVariable("var#1 2"), ["var", "1 2"]),
     ],
 )
 def test_splitter(variable: resolver_type, exp_split: list[str]) -> None:
@@ -85,6 +88,23 @@ def test_splitter(variable: resolver_type, exp_split: list[str]) -> None:
             v.ResolveBracketVariable("[var1][var2][var3]"),
             ["Variable name must start with a letter. Variable: [var1][var2][var3]"],
         ),
+        (v.ResolveHashVariable("var#1"), []),
+        (
+            v.ResolveHashVariable("var#1#2"),
+            ["Variable name can not contain more than one #. Variable: var#1#2"],
+        ),
+        (
+            v.ResolveHashVariable("1var#1#2"),
+            ["Variable name can not contain more than one #. Variable: 1var#1#2"],
+        ),
+        (
+            v.ResolveHashVariable("1-var#a"),
+            [
+                "Variable name must start with a letter. Variable: 1-var",
+                "Variable contains an invalid symbol. Variable: 1-var",
+                "Value following a # must be a number. Variable: 1-var#a",
+            ],
+        ),
         #     (v.ResolveBracketHashVariable("var1[var2#1]"), True, ""),
         #     (
         #         v.ResolveBracketHashVariable("var10[var2#1#2]"),
@@ -141,6 +161,8 @@ def test_validate_struct(variable: resolver_type, exp_errors: list[str]) -> None
         (v.ResolveBaseVariable("  ")),
         (v.ResolveBracketVariable("")),
         (v.ResolveBracketVariable(" ")),
+        (v.ResolveHashVariable("")),
+        (v.ResolveHashVariable(" ")),
     ],
 )
 def test_validate_struct_exception(variable: resolver_type) -> None:
@@ -224,10 +246,30 @@ game_variables: dict[str, Any] = {
             "var_2_3_4",
             "SUCCESS",
         ),
+        (
+            v.ResolveBracketVariable("var[var_2][var[var_4]]"),
+            [
+                "Variable name is not defined in a *create or *temp command."
+                " Variable: var_2_4"
+            ],
+            "",
+            "",
+        ),
+        (v.ResolveHashVariable("var_1_2_3#1"), [], "var_1_2_3#1", "S"),
+        (v.ResolveHashVariable("var_1_2_3#5"), [], "var_1_2_3#5", "E"),
+        (
+            v.ResolveHashVariable("var_99#5"),
+            [
+                "Variable name is not defined in a *create or *temp command."
+                " Variable: var_99"
+            ],
+            "",
+            "",
+        ),
     ],
 )
 def test_resolver_valid_struct(
     variable: resolver_type, exp_errors: list[str], exp_name: str, exp_value: Any
 ) -> None:
-    errors, name, value = variable.resolve(def_variables, game_variables)
+    errors, name, value = variable.resolve(game_variables)
     assert errors == exp_errors and name == exp_name and value == exp_value
