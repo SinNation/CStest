@@ -57,6 +57,11 @@ class CallVarValidator:
         of open and closed square brackets"""
         return True if self.name.count("[") == self.name.count("]") else False
 
+    def hash_correct_place(self) -> bool:
+        """Checks that the hash is in a correct place within the variable name.
+        A hash must always be bound by a single set of square brackets."""
+        return True if self.name.count("]") > 0 else False
+
     def is_defined(self) -> bool:
         """Checks that the called variable name is defined in the game"""
         return True if self.name in self.game_variables else False

@@ -126,6 +126,15 @@ class ResolveBracketVariable(Resolver):
                 errors.extend(
                     CallVarValidator(variable.replace("#", "")).is_name_valid()
                 )
+                if "#" in variable:
+                    if not CallVarValidator(variable).hash_correct_place():
+                        errors.append(
+                            var_error_string("hash_incorrect_place", self.call_name)
+                        )
+                    errors.extend(
+                        ResolveHashVariable(variable.replace("]", "")).validate_struct()
+                    )
+
         else:
             errors.append(var_error_string("mismatch_bracket", self.call_name))
 

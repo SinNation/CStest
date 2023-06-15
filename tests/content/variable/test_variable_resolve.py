@@ -73,6 +73,8 @@ def test_splitter(variable: resolver_type, exp_split: list[str]) -> None:
         (v.ResolveBracketVariable("var1[var2]"), []),
         (v.ResolveBracketVariable("var1[var2][var3[var4]]"), []),
         (v.ResolveBracketVariable("var1[var2[var3]]"), []),
+        (v.ResolveBracketVariable("var1[var2#1]"), []),
+        (v.ResolveBracketVariable("var1[var2#2][var3[var4#1]]"), []),
         (
             v.ResolveBracketVariable("var1[var2][var3"),
             [
@@ -105,50 +107,49 @@ def test_splitter(variable: resolver_type, exp_split: list[str]) -> None:
         (
             v.ResolveBracketVariable("[var1][var2][var3]"),
             ["Variable name must start with a letter. Variable: [var1][var2][var3]"],
-        )
-        #     (v.ResolveBracketHashVariable("var1[var2#1]"), True, ""),
-        #     (
-        #         v.ResolveBracketHashVariable("var10[var2#1#2]"),
-        #         False,
-        #         "Variable name should only contain a single"
-        #         " pair of square brackets and a single #. Variable: var10[var2#1#2]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var10[var2##1]"),
-        #         False,
-        #         "Variable name should only contain a single"
-        #         " pair of square brackets and a single #. Variable: var10[var2##1]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var10[[var2#2]]"),
-        #         False,
-        #         "Variable name should only contain a single"
-        #         " pair of square brackets and a single #. Variable: var10[[var2#2]]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var10#1[var2#1#2]"),
-        #         False,
-        #         "Variable name should only contain a single"
-        #         " pair of square brackets and a single #. Variable:"
-        #         " var10#1[var2#1#2]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var10[var2#1]"),
-        #         False,
-        #         "Variable name is not defined in a *create"
-        #         " or *temp command. Variable: var10[var2#1]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var1[var20#1]"),
-        #         False,
-        #         "Variable name is not defined in a *create or *temp command."
-        #         " Variable: var1[var20#1]",
-        #     ),
-        #     (
-        #         v.ResolveBracketHashVariable("var1[var2#a]"),
-        #         False,
-        #         "Value following a # must be an integer. Variable: var1[var2#a]",
-        #     ),
+        ),
+        (
+            v.ResolveBracketVariable("var10[var2#1#2]"),
+            ["Variable name can not contain more than one #. Variable: var2#1#2"],
+        ),
+        (
+            v.ResolveBracketVariable("var10#1[var2#2]"),
+            [
+                "Use of # must always occur within a single set of []. You can not"
+                " slice a variable value that is being used to construct a full"
+                " variable name. Variable: var10#1[var2#2]"
+            ],
+        ),
+        (
+            v.ResolveBracketVariable("var[var2#2[var3]]"),
+            [
+                "Use of # must always occur within a single set of []. You can not"
+                " slice a variable value that is being used to construct a full"
+                " variable name. Variable: var[var2#2[var3]]"
+            ],
+        ),
+        (
+            v.ResolveBracketVariable("var10[var2#a]"),
+            ["Value following a # must be a number. Variable: var2#a"],
+        ),
+        (
+            v.ResolveBracketVariable("[var10#1[[-var2##a]"),
+            ["Variable name must start with a letter. Variable: [var10#1[[-var2##a]"],
+        ),
+        (
+            v.ResolveBracketVariable("1var10#a[-var2##2]"),
+            [
+                "Variable name must start with a letter. Variable: 1var10a",
+                "Use of # must always occur within a single set of []. You can not"
+                " slice a variable value that is being used to construct a full"
+                " variable name. Variable: 1var10#a[-var2##2]",
+                "Variable name must start with a letter. Variable: 1var10",
+                "Value following a # must be a number. Variable: 1var10#a",
+                "Variable name must start with a letter. Variable: -var22]",
+                "Variable contains an invalid symbol. Variable: -var22]",
+                "Variable name can not contain more than one #. Variable: -var2##2",
+            ],
+        ),
     ],
 )
 def test_validate_struct(variable: resolver_type, exp_errors: list[str]) -> None:
