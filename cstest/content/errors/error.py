@@ -10,6 +10,7 @@ ERR = {
     " variable name",
     # Variable resolver errors
     "inv_var": "Variable name is not defined in a *create or *temp command",
+    "inv_hash": "Value given with # is higher than the length of the variable value",
     # IF errors
     "if_param_count": "*IF statement is incorrectly formed, either containing"
     " more than 4, or 0, components for a single condition",
