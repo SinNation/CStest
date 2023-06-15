@@ -1,5 +1,6 @@
+from typing import Any
+
 from cstest.content.errors.error import var_error_string
-from cstest.content.variable.def_var import DefinedVariable
 from cstest.content.variable.exceptions import NoVariableNameValue
 
 INVALID_VAR_SYMBOLS = [
@@ -62,6 +63,7 @@ def validate_variable_name(name: str) -> list[str]:
 
 
 def first_char_sq_bracket(name: str) -> bool:
+    """Checks if the first characer of a variable name is a square bracket"""
     return True if name[0] == "[" else False
 
 
@@ -71,6 +73,14 @@ def equal_sq_brackets(name: str) -> bool:
     return True if name.count("[") == name.count("]") else False
 
 
-def is_defined_variable(name: str, def_variables: list[str]) -> bool:
+def is_defined_variable(name: str, game_variables: list[str]) -> bool:
     """Checks that the called variable name is defined in the game"""
-    return True if name in def_variables else False
+    return True if name in game_variables else False
+
+
+def check_count_hashes(name: str) -> bool:
+    return True if name.count("#") == 1 else False
+
+
+def check_hash_is_number(hash: Any) -> bool:
+    return True if str(hash).isnumeric() else False
