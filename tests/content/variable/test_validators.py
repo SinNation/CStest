@@ -1,7 +1,7 @@
 import pytest
 
-from cstest.content.variable import validators as v
 from cstest.content.variable.exceptions import NoVariableNameValue
+from cstest.content.variable.validators import CallVarValidator
 
 
 @pytest.mark.parametrize(
@@ -10,7 +10,7 @@ from cstest.content.variable.exceptions import NoVariableNameValue
 )
 def test_empty_variable_nname(name: str) -> None:
     with pytest.raises(NoVariableNameValue):
-        v.empty_variable_name(name)
+        CallVarValidator(name).is_blank()
 
 
 @pytest.mark.parametrize(
@@ -25,22 +25,22 @@ def test_empty_variable_nname(name: str) -> None:
     ],
 )
 def test_is_first_alpha(name: str, exp_outcome: bool) -> None:
-    assert v.is_first_alpha(name) == exp_outcome
+    assert CallVarValidator(name).is_first_alpha() == exp_outcome
 
 
 @pytest.mark.parametrize(
     "name, exp_outcome",
     [
-        ("name", True),
-        ("valid_symbol[name]", True),
-        ("£", False),
-        ("Wo=rd", False),
-        ("bla nk", False),
-        ("Bl@$h", False),
+        ("name", False),
+        ("valid_symbol[name]", False),
+        ("£", True),
+        ("Wo=rd", True),
+        ("bla nk", True),
+        ("Bl@$h", True),
     ],
 )
 def test_inv_symbol(name: str, exp_outcome: bool) -> None:
-    assert v.inv_symbol(name) == exp_outcome
+    assert CallVarValidator(name).inv_symbol() == exp_outcome
 
 
 @pytest.mark.parametrize(
@@ -60,12 +60,12 @@ def test_inv_symbol(name: str, exp_outcome: bool) -> None:
     ],
 )
 def test_validate_variable_name(name: str, exp_error: str) -> None:
-    assert v.validate_variable_name(name) == exp_error
+    assert CallVarValidator(name).is_name_valid() == exp_error
 
 
 @pytest.mark.parametrize("name, exp_outcome", [("name", False), ("[name", True)])
 def test_first_char_sq_bracket(name: str, exp_outcome: bool) -> None:
-    assert v.first_char_sq_bracket(name) == exp_outcome
+    assert CallVarValidator(name).is_first_bracket() == exp_outcome
 
 
 @pytest.mark.parametrize(
@@ -80,7 +80,7 @@ def test_first_char_sq_bracket(name: str, exp_outcome: bool) -> None:
     ],
 )
 def test_equal_sq_brackets(variables: str, exp_outcome: bool) -> None:
-    assert v.equal_sq_brackets(variables) == exp_outcome
+    assert CallVarValidator(variables).is_equal_bracket() == exp_outcome
 
 
 @pytest.mark.parametrize(
@@ -94,7 +94,7 @@ def test_equal_sq_brackets(variables: str, exp_outcome: bool) -> None:
 def test_is_defined_variable(
     name: str, game_variables: list[str], exp_outcome: bool
 ) -> None:
-    assert v.is_defined_variable(name, game_variables) == exp_outcome
+    assert CallVarValidator(name, game_variables).is_defined() == exp_outcome
 
 
 @pytest.mark.parametrize(
@@ -102,7 +102,7 @@ def test_is_defined_variable(
     [("var1", False), ("var1#1", True), ("var1#1#2", False), ("v#ar#1#2", False)],
 )
 def test_check_count_hashes(name: str, exp_outcome: bool) -> None:
-    assert v.check_count_hashes(name) == exp_outcome
+    assert CallVarValidator(name).single_hash() == exp_outcome
 
 
 @pytest.mark.parametrize(
@@ -117,4 +117,4 @@ def test_check_count_hashes(name: str, exp_outcome: bool) -> None:
     ],
 )
 def test_check_hash_is_number(name: str, exp_outcome: bool) -> None:
-    assert v.check_hash_is_number(name) == exp_outcome
+    assert CallVarValidator(name).hash_is_number() == exp_outcome
