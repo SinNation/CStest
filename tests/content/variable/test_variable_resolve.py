@@ -179,11 +179,12 @@ def_variables = [
     "var_1",
     "var_2",
     "var_3",
+    "var_33",
     "var_4",
+    "var_44",
     "var_5",
     "var_6",
     "var_2_3",
-    "var_1_2",
     "var_1_2",
     "var_1_6",
     "var_4_5",
@@ -195,7 +196,9 @@ game_variables: dict[str, Any] = {
     "var_1": 1,
     "var_2": 2,
     "var_3": 3,
+    "var_33": 13,
     "var_4": 4,
+    "var_44": 35474,
     "var_5": 5,
     "var_6": 6,
     "var_2_3": 2,
@@ -225,6 +228,15 @@ game_variables: dict[str, Any] = {
             [
                 "Variable name is not defined in a *create or *temp command."
                 " Variable: var_99"
+            ],
+            "",
+            "",
+        ),
+        (
+            v.ResolveHashVariable("var_3#2"),
+            [
+                "Value given with # is higher than the length of the variable value."
+                " Variable: var_3#2"
             ],
             "",
             "",
@@ -265,6 +277,52 @@ game_variables: dict[str, Any] = {
                 "Variable name is not defined in a *create or *temp command."
                 " Variable: var_2_4"
             ],
+            "",
+            "",
+        ),
+        (
+            v.ResolveBracketVariable("var[var_1][var_2][var_33#2]"),
+            [],
+            "var_1_2_3",
+            "SUCCESS",
+        ),
+        (
+            v.ResolveBracketVariable("var[var_1[var_6]][var_33#2][var_44#5]"),
+            [],
+            "var_1_2_3_4",
+            "SUCCESS",
+        ),
+        (
+            v.ResolveBracketVariable("var[var#1[var_2]]"),
+            [
+                "Value following a # must be a number. Variable: var#1_2",
+                "Variable name is not defined in a *create or *temp command."
+                " Variable: var_",
+            ],
+            "",
+            "",
+        ),
+        (
+            v.ResolveBracketVariable("var[var_1][var_2][var_33#20]"),
+            [
+                "Value given with # is higher than the length of the variable value."
+                " Variable: var_33#20"
+            ],
+            "",
+            "",
+        ),
+        (
+            v.ResolveBracketVariable("var[var_1[var_2[var_33#1]]]"),
+            [
+                "Variable name is not defined in a *create or *temp command. Variable:"
+                " var_2_1"
+            ],
+            "",
+            "",
+        ),
+        (
+            v.ResolveBracketVariable("var[var_1][var_2##1][var[var_3]]"),
+            ["Variable name can not contain more than one #. Variable: var_2##1"],
             "",
             "",
         ),

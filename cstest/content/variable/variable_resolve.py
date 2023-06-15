@@ -59,10 +59,7 @@ class ResolveBaseVariable(Resolver):
 
     def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         errors = self.validate_struct()
-        if not errors:
-            return self.resolve(game_variables)
-        else:
-            return errors, "", ""
+        return (self.resolve(game_variables)) if not errors else (errors, "", "")
 
 
 @dataclass
@@ -94,18 +91,20 @@ class ResolveHashVariable(Resolver):
         var = ResolveBaseVariable(split[0].replace("]", ""))
         errors, _, value = var.process(game_variables)
         split_val = int(split[1]) - 1
-        return (
-            (errors, self.call_name, str(value)[split_val])
-            if not errors
-            else (errors, "", "")
-        )
+
+        if not errors:
+            try:
+                out_val = str(value)[split_val]
+                return errors, self.call_name, out_val
+            except IndexError:
+                errors.append(var_error_string("inv_hash", self.call_name))
+                return errors, "", ""
+        else:
+            return errors, "", ""
 
     def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         errors = self.validate_struct()
-        if not errors:
-            return self.resolve(game_variables)
-        else:
-            return errors, "", ""
+        return (self.resolve(game_variables)) if not errors else (errors, "", "")
 
 
 @dataclass
@@ -146,6 +145,7 @@ class ResolveBracketVariable(Resolver):
         final_variable = ""
         bracket_value = ""
         errors: list[str] = []
+        full_errors: list[str] = []
         length = len(self.splitter())
 
         for iteration, part_name in enumerate(reversed(self.splitter())):
@@ -153,10 +153,11 @@ class ResolveBracketVariable(Resolver):
                 final_variable = f"{part_name}{bracket_value}{final_variable}"
                 var = ResolveBaseVariable(final_variable.replace("]", ""))
                 errors, name, value = var.process(game_variables)
-                return errors, name, value
+                full_errors.extend(errors)
+                return full_errors, name, value
 
             else:
-                if not errors:
+                if not full_errors:
                     if part_name.count("]") == 1:
                         if bracket_value != "":
                             final_variable = f"{bracket_value}{final_variable}"
@@ -171,17 +172,30 @@ class ResolveBracketVariable(Resolver):
                             var = ResolveBaseVariable(f"{part_name}".replace("]", ""))
                             errors, name, value = var.process(game_variables)
 
-                        final_variable = f"_{value}{final_variable}"
+                        if errors:
+                            full_errors.extend(errors)
+                            return full_errors, "", ""
+                        else:
+                            final_variable = f"_{value}{final_variable}"
                     else:
-                        var = ResolveBaseVariable(
-                            f"{part_name}{bracket_value}".replace("]", "")
-                        )
-                        errors, name, value = var.process(
-                            game_variables,
-                        )
+                        if "#" in part_name:
+                            hash_var = ResolveHashVariable(
+                                f"{part_name}{bracket_value}".replace("]", "")
+                            )
+                            errors, name, value = hash_var.process(game_variables)
+                        else:
+                            var = ResolveBaseVariable(
+                                f"{part_name}{bracket_value}".replace("]", "")
+                            )
+                            errors, name, value = var.process(
+                                game_variables,
+                            )
                         bracket_value = f"_{value}"
+                        full_errors.extend(errors)
+                else:
+                    return full_errors, "", ""
 
-        return errors, "", ""
+        return full_errors, "", ""
 
     def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         return [], "", ""
