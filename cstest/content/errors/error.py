@@ -5,7 +5,7 @@ ERR = {
     "mismatch_bracket": "Variable does not contain equal number of '[' and ']'",
     "multiple_hash": "Variable name can not contain more than one #",
     "hash_not_number": "Value following a # must be a number",
-    "hash_incorrect_place": "Use of # must always occur within a single set of []."
+    "hash_place": "Use of # must always occur within a single set of []."
     " You can not slice a variable value that is being used to construct a full"
     " variable name",
     # Variable resolver errors
