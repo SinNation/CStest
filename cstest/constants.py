@@ -6,25 +6,11 @@ from pathlib import Path
 TIMESTAMP = datetime.now().strftime("%Y%M%d-%H%M%S")
 
 CS_PATH = Path.cwd()
+USER_DATA = CS_PATH / "usr_data"
 DATA_PATH = CS_PATH / "data"
 PROJECTS_PATH = CS_PATH.parents[0]
 INVALID_LINE_FILE = "invalid_line.csv"
 
-
-ERRORS = {
-    "if_param_count": """*IF statement is incorrectly formed, either containing
-     more than 4, or 0, components for a single condition""",
-    "if_true": """*IF condition containing a single component must be a
-     variable name and not a mathematical operation or number""",
-    "if_false": """*IF condition containing only 2 components can only
-     take the form of *IF NOT [variable]""",
-    "if_operator": "*IF statement contains an invalid operator",
-    "if_equality_variable": "*IF statement must contain a string variable name",
-    "if_equality_value_str": """*IF statement value can not be a string if the
-     operator is > or <""",
-    "if_equality_value_opr": "*IF statement value can not be an operator",
-    "if_double_value": "*IF statement has two arguments passed for the value component",
-}
 
 OPERATORS = ["(", ")", ">=", "<=", ">", "<", "=", "!=", "!", "NOT"]
 CONNECTORS = ["AND", "OR"]

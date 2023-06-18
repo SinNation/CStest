@@ -30,13 +30,13 @@ class Resolver(ABC):
         ...
 
     @abstractmethod
-    def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
+    def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         """Calls the components of the resolver class to enable full processing of
         a variable name"""
 
 
 @dataclass
-class ResolveBaseVariable(Resolver):
+class ResolveBaseVar(Resolver):
     """Resolver class for 'base' variables, i.e., those without square brackets
     or hashes. E.g., ${variable_name}"""
 
@@ -57,13 +57,13 @@ class ResolveBaseVariable(Resolver):
         else:
             return [var_error_string("inv_var", self.call_name)], "", ""
 
-    def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
+    def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         errors = self.validate_struct()
         return (self.resolve(game_variables)) if not errors else (errors, "", "")
 
 
 @dataclass
-class ResolveHashVariable(Resolver):
+class ResolveHashVar(Resolver):
     call_name: str
 
     def splitter(self) -> list[str]:
@@ -75,6 +75,9 @@ class ResolveHashVariable(Resolver):
         errors = []
         if not CallVarValidator(self.call_name).single_hash():
             return [var_error_string("multiple_hash", self.call_name)]
+
+        # If more than one hash (above), then can't correctly split and
+        # evaluate the two components of the variable call
 
         split = self.splitter()
         errors.extend(CallVarValidator(split[0]).is_name_valid())
@@ -88,27 +91,28 @@ class ResolveHashVariable(Resolver):
     ) -> Tuple[list[str], str, Any]:
         split = self.splitter()
 
-        var = ResolveBaseVariable(split[0].replace("]", ""))
-        errors, _, value = var.process(game_variables)
+        # Get the value of the variable, then generate the index to slice from the hash
+        var = ResolveBaseVar(split[0].replace("]", ""))
+        errors, _, value = var.val_process(game_variables)
         split_val = int(split[1]) - 1
 
         if not errors:
             try:
-                out_val = str(value)[split_val]
+                # If hash value is invalid, this will return an index error
+                out_val = str(value)[split_val]  # Slice variable value using hash val
                 return errors, self.call_name, out_val
             except IndexError:
-                errors.append(var_error_string("inv_hash", self.call_name))
-                return errors, "", ""
+                return [var_error_string("inv_hash", self.call_name)], "", ""
         else:
             return errors, "", ""
 
-    def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
+    def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         errors = self.validate_struct()
         return (self.resolve(game_variables)) if not errors else (errors, "", "")
 
 
 @dataclass
-class ResolveBracketVariable(Resolver):
+class ResolveBracketVar(Resolver):
     call_name: str
 
     def splitter(self) -> list[str]:
@@ -120,22 +124,20 @@ class ResolveBracketVariable(Resolver):
         errors = []
         if CallVarValidator(self.call_name).is_first_bracket():
             errors.append(var_error_string("first_alpha", self.call_name))
-        elif CallVarValidator(self.call_name).is_equal_bracket():
-            for variable in self.splitter():
-                errors.extend(
-                    CallVarValidator(variable.replace("#", "")).is_name_valid()
-                )
-                if "#" in variable:
-                    if not CallVarValidator(variable).hash_correct_place():
-                        errors.append(
-                            var_error_string("hash_incorrect_place", self.call_name)
-                        )
-                    errors.extend(
-                        ResolveHashVariable(variable.replace("]", "")).validate_struct()
-                    )
-
-        else:
+        if not CallVarValidator(self.call_name).is_equal_bracket():
             errors.append(var_error_string("mismatch_bracket", self.call_name))
+
+        if errors:
+            return errors
+
+        for var in self.splitter():  # Iterate over each component of variable
+            errors.extend(CallVarValidator(var.replace("#", "")).is_name_valid())
+            if "#" in var:
+                # Specific validation of hash when included as part of a bracket var
+                if not CallVarValidator(var).hash_correct_place():
+                    errors.append(var_error_string("hash_place", self.call_name))
+                # Then usual validation of a hash variable
+                errors.extend(ResolveHashVar(var.replace("]", "")).validate_struct())
 
         return errors
 
@@ -146,56 +148,54 @@ class ResolveBracketVariable(Resolver):
         bracket_value = ""
         errors: list[str] = []
         full_errors: list[str] = []
-        length = len(self.splitter())
 
         for iteration, part_name in enumerate(reversed(self.splitter())):
-            if iteration + 1 == length:
+            if iteration + 1 == len(self.splitter()):
+                # Final component of variable - can't contain a bracket or hash
+                # Pulls together remaining constituent parts
                 final_variable = f"{part_name}{bracket_value}{final_variable}"
-                var = ResolveBaseVariable(final_variable.replace("]", ""))
-                errors, name, value = var.process(game_variables)
+                # Final variable is always a 'base' variable
+                var: Resolver = ResolveBaseVar(final_variable.replace("]", ""))
+                errors, name, value = var.val_process(game_variables)
                 full_errors.extend(errors)
                 return full_errors, name, value
 
             else:
-                if not full_errors:
-                    if part_name.count("]") == 1:
-                        if bracket_value != "":
-                            final_variable = f"{bracket_value}{final_variable}"
-                            bracket_value = ""
-
-                        if "#" in part_name:
-                            hash_var = ResolveHashVariable(
-                                f"{part_name}".replace("]", "")
-                            )
-                            errors, name, value = hash_var.process(game_variables)
-                        else:
-                            var = ResolveBaseVariable(f"{part_name}".replace("]", ""))
-                            errors, name, value = var.process(game_variables)
-
-                        if errors:
-                            full_errors.extend(errors)
-                            return full_errors, "", ""
-                        else:
-                            final_variable = f"_{value}{final_variable}"
-                    else:
-                        if "#" in part_name:
-                            hash_var = ResolveHashVariable(
-                                f"{part_name}{bracket_value}".replace("]", "")
-                            )
-                            errors, name, value = hash_var.process(game_variables)
-                        else:
-                            var = ResolveBaseVariable(
-                                f"{part_name}{bracket_value}".replace("]", "")
-                            )
-                            errors, name, value = var.process(
-                                game_variables,
-                            )
-                        bracket_value = f"_{value}"
-                        full_errors.extend(errors)
-                else:
+                if full_errors:
                     return full_errors, "", ""
+
+                # Fully enclosed component - goes and fetches the value of that
+                # component. If prior component was a bracket value, appends that
+                # in first, as it is resolved.
+                if part_name.count("]") == 1:
+                    final_variable = f"{bracket_value}{final_variable}"
+                    bracket_value = ""
+
+                    var = (
+                        ResolveHashVar(f"{part_name}".replace("]", ""))
+                        if "#" in part_name
+                        else ResolveBaseVar(f"{part_name}".replace("]", ""))
+                    )
+                    errors, name, value = var.val_process(game_variables)
+                    full_errors.extend(errors)
+
+                    final_variable = f"_{value}{final_variable}"
+
+                # Is a nested bracket value, to be appended to the next value
+                else:
+                    var = (
+                        ResolveHashVar(f"{part_name}{bracket_value}".replace("]", ""))
+                        if "#" in part_name
+                        else ResolveBaseVar(
+                            f"{part_name}{bracket_value}".replace("]", "")
+                        )
+                    )
+                    errors, name, value = var.val_process(game_variables)
+
+                    bracket_value = f"_{value}"
+                    full_errors.extend(errors)
 
         return full_errors, "", ""
 
-    def process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
+    def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         return [], "", ""
