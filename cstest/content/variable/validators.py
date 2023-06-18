@@ -46,6 +46,7 @@ class CallVarValidator:
         return True if self.name.count("#") == 1 else False
 
     def hash_is_number(self) -> bool:
+        """Checks that the value of the hash is a number"""
         return True if str(self.name).isnumeric() else False
 
     def is_first_bracket(self) -> bool:
