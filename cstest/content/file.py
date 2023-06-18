@@ -5,7 +5,7 @@ from typing import Callable, Optional
 
 from cstest.constants import COMMON_NON_VARIABLE_WORDS, KEYWORDS, Commands
 from cstest.content.effect import Effect
-from cstest.content.variable import Variable
+from cstest.content.variable.variable import DefinedVariable
 
 
 def sq_bracket_handler(word: str) -> str:
@@ -37,7 +37,7 @@ class Line:
     command_type: Commands = field(init=False)
     called_variables: list[str] = []
     called_bracket_variables: list[str] = []
-    created_variable: Optional[Variable] = None
+    created_variable: Optional[DefinedVariable] = None
     # condition_map: Optional[Condition] = None
     effect: Optional[Effect] = None
     # next line
@@ -90,7 +90,7 @@ class Line:
             return
 
         var_type = "str" if isinstance(value, str) else "number"
-        self.created_variable = Variable(name, var_type, value)
+        self.created_variable = DefinedVariable(name, var_type)
 
     def find_cmd_call_variables(self, string: str) -> None:
         """Iterates over every word in the command. If it is a literal string

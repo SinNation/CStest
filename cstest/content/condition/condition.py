@@ -1,40 +1,52 @@
 #   BRACKET VARIABLES
+#   # to denote number
+#   Invalid statements
 
 from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
-from cstest.constants import CONNECTORS, ERRORS, IF_COMMANDS, OPERATORS
+from cstest.constants import CONNECTORS, IF_COMMANDS, OPERATORS
 from cstest.content.condition.params import recode_params, validate_params
+
+# if var = 1
+# if var = "str"
+# if var = var
+# if var = var[var2]
+# if var = var[var2#1]
+# if var = var[var2]#1
+# if var = var[var2#1]#1
 
 
 @dataclass
 class Condition:
-    """Definition of an IF condition."""
-
-    variable: str
+    full_variable: str
     operator: str
     value: str
+
+    def __post_init__(self) -> None:
+        self.base_variable: str
+        self.base_hash: int
+        self.bracket_variable: str
+        self.bracket_hash: int
+
+    def resolve_variable(Self) -> None:
+        pass
+
+    def evaluate_condition(self) -> None:
+        """Return variable value == self.value"""
+        pass
 
 
 condition_dict = dict[int, Condition]
 condition_map_type = list[list[Condition]]
 
 
-def create_condition(
-    params: list[str],
-    condition_num: int,
-    string_conditions: condition_dict,
-) -> Tuple[condition_dict, str]:
+def create_condition(params: list[str], length: int) -> Condition:
     """Standardises parameters and uses them to create Condition object"""
-    length, error = validate_params(params)
-    if error != "":
-        return {}, error
-    else:
-        string_conditions[condition_num] = Condition(*recode_params(params, length))
-        return string_conditions, ""
+    return Condition(*recode_params(params, length))
 
 
 def identify_conditions(
@@ -63,11 +75,13 @@ def identify_conditions(
         word = word.replace("'", "").replace('"', "")
 
         if word in CONNECTORS and not is_string:  # End of condition found
-            string_conditions, error = create_condition(
-                params, condition_num, string_conditions
-            )
-            condition_num += 1
-            params = []  # Reset for next condition
+            length, error = validate_params(params, len(params))
+            if error == "":
+                string_conditions[condition_num] = create_condition(params, length)
+                condition_num += 1
+                params = []  # Reset for next condition
+            else:
+                return {}, error
         else:  # Mid-condition, keep appending the word as the next parameter
             if is_string and not start_string:  # Word is mid multi word string
                 params[len(params) - 1] = params[len(params) - 1] + " " + word
@@ -82,14 +96,13 @@ def identify_conditions(
             params.append(word)  # Append any other word, or starting word of the string
             start_string = False  # Can always be safely turned off
 
-        if error != "":
-            return {}, error
-
     # The last condition won't reach another AND or OR, so process it here
-    string_conditions, error = create_condition(
-        params, condition_num, string_conditions
-    )
-    return ({}, error) if error != "" else (string_conditions, "")
+    length, error = validate_params(params, len(params))
+    if error == "":
+        string_conditions[condition_num] = create_condition(params, length)
+    else:
+        return {}, error
+    return string_conditions, ""
 
 
 def is_sublist(lst: Any) -> bool:

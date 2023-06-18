@@ -1,4 +1,5 @@
-from typing import Any, Union
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -7,26 +8,28 @@ from cstest.content.condition import condition as c
 
 
 @pytest.mark.parametrize(
-    "params, result",
+    "params, exp_cond, exp_error",
     [
-        (["VAR"], {1: c.Condition("VAR", "boolean", "True")}),
-        (["NOT", "VAR"], {1: c.Condition("VAR", "boolean", "False")}),
-        (["VAR", "=", "20"], {1: c.Condition("VAR", "=", "20")}),
-        (["VAR", ">", "30"], {1: c.Condition("VAR", ">", "30")}),
-        (["VAR", ">", "=", "40"], {1: c.Condition("VAR", ">=", "40")}),
-        (["VAR", "!=", "30"], {1: c.Condition("VAR", "!=", "30")}),
-        (["VAR", "!", "=", "40"], {1: c.Condition("VAR", "!=", "40")}),
-        (["VAR", "<=", "50"], {1: c.Condition("VAR", "<=", "50")}),
-        (["VAR", "=", "A B C"], {1: c.Condition("VAR", "=", "A B C")}),
+        (["VAR"], {1: c.Condition("VAR", "boolean", "True")}, ""),
+        (["NOT", "VAR"], {1: c.Condition("VAR", "boolean", "False")}, ""),
+        (["VAR", "=", "20"], {1: c.Condition("VAR", "=", "20")}, ""),
+        (["VAR", ">", "30"], {1: c.Condition("VAR", ">", "30")}, ""),
+        (["VAR", ">", "=", "40"], {1: c.Condition("VAR", ">=", "40")}, ""),
+        (["VAR", "!=", "30"], {1: c.Condition("VAR", "!=", "30")}, ""),
+        (["VAR", "!", "=", "40"], {1: c.Condition("VAR", "!=", "40")}, ""),
+        (["VAR", "<=", "50"], {1: c.Condition("VAR", "<=", "50")}, ""),
+        (["VAR", "=", "A B C"], {1: c.Condition("VAR", "=", "A B C")}, ""),
         ([], {}),
         (["1", "2", "3", "4", "5"], {}),
         ([">", ">", ">"], {}),
         (["VAR", ">", "20", "24"], {}),
     ],
 )
-def test_create_condition(params: list[str], result: c.condition_dict) -> None:
-    cond, _ = c.create_condition(params, 1, {})
-    assert cond == result
+def test_create_condition(
+    params: list[str], exp_cond: c.condition_dict, exp_error: str
+) -> None:
+    cond = c.create_condition(params, 1)
+    assert cond == exp_cond
 
 
 @pytest.mark.parametrize(
@@ -725,3 +728,74 @@ def test_process_conditions(
 ) -> None:
     pass
     # assert c.process_conditions(list_line) == exp_cond_map
+
+
+@pytest.mark.parametrize(
+    "line, exp_output",
+    [
+        ("", []),
+        ("word", ["WORD"]),
+        ("WORD", ["WORD"]),
+        ("*if", []),
+        (" word ", ["WORD"]),
+        ("  wo rd  ", ["WO", "RD"]),
+        ("if word = 2", ["IF", "WORD", "=", "2"]),
+        ("*if word>=2 and not word", ["WORD", ">", "=", "2", "AND", "NOT", "WORD"]),
+        (
+            "()><!not=>=<=!=",
+            ["(", ")", ">", "<", "!", "NOT", "=", ">", "=", "<", "=", "!", "="],
+        ),
+        ("*if ((word =2))", ["(", "(", "WORD", "=", "2", ")", ")"]),
+    ],
+)
+def test_pre_process_line(line: str, exp_output: list[str]) -> None:
+    assert c.pre_process_line(line) == exp_output
+
+
+def test_create_condition_map() -> None:
+    string = """*if (( VAR_A AND ( ( VAR_B >= 45 OR NOT VAR_C ) OR VAR_D = A STRING ) )
+      AND ( VAR_E AND ( VAR_F OR VAR_G!= STRING ) )) OR VAR_H )"""
+
+    exp_map = [
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_B", ">=", "45"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_F", "boolean", "True"),
+        ],
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_C", "boolean", "False"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_F", "boolean", "True"),
+        ],
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_D", "=", "A STRING"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_F", "boolean", "True"),
+        ],
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_B", ">=", "45"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_G", "!=", "STRING"),
+        ],
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_C", "boolean", "False"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_G", "!=", "STRING"),
+        ],
+        [
+            c.Condition("VAR_A", "boolean", "True"),
+            c.Condition("VAR_D", "=", "A STRING"),
+            c.Condition("VAR_E", "boolean", "True"),
+            c.Condition("VAR_G", "!=", "STRING"),
+        ],
+        [c.Condition("VAR_H", "boolean", "True")],
+    ]
+
+    act_map, error = c.create_condition_map(string)
+
+    assert act_map == exp_map and error == ""

@@ -5,7 +5,7 @@ from cstest.cli.util import banner
 from cstest.constants import PROJECTS_PATH
 from cstest.content.context import Context
 from cstest.content.file import File
-from cstest.content.variable import Variable
+from cstest.content.variable.variable import DefinedVariable
 
 
 @dataclass
@@ -16,7 +16,7 @@ class Project:
     file_list: list[Path] = field(init=False)
     files: list[File] = field(init=False)
     file_number: int = field(init=False)
-    variables: list[Variable] = field(init=False)
+    variables: list[DefinedVariable] = field(init=False)
     # context: Context = field(init=False)
 
     def rep_test_initialise(self) -> None:
