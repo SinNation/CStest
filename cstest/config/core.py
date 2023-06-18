@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cstest.cli.util import banner
-from cstest.constants import PROJECTS_PATH, DATA_PATH, TIMESTAMP
+from cstest.constants import DATA_PATH, PROJECTS_PATH, TIMESTAMP
 
 
 @dataclass
@@ -10,10 +9,10 @@ class Config:
     project_name: str = field(init=False)
     project_path: Path = field(init=False)
     test_path: Path = field(init=False)
+    ignored_files: list[str] = field(default_factory=list)
 
     def set_folder_path(self) -> None:
         while True:
-            banner("")
             folder_name = input(
                 "What is the folder name of the project you would like to test?"
             )
@@ -35,3 +34,4 @@ class Config:
     def config_test(self) -> None:
         self.set_folder_path()
         self.create_test_folder()
+        self.ignored_files = ["choicescript_stats"]

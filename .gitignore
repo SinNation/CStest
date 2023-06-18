@@ -1,5 +1,6 @@
 sample/
 data/
+usr_data/
 cstest/CStest.py
 
 ### dotfiles ###
