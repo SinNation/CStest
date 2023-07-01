@@ -24,8 +24,12 @@ ERR = {
     " operator is > or <",
     "if_equality_value_opr": "*IF statement value can not be an operator",
     "if_double_value": "*IF statement has two arguments passed for the value component",
+    # Command errors
+    "invalid_command": "Command following * is not valid",
+    # Command warnings
+    "missing_*": "Line starts with a valid command keyword and may be missing an *",
 }
 
 
-def var_error_string(err_type: str, variable: str) -> str:
-    return f"{ERR[err_type]}. Variable: {variable}"
+def error_string(err: str, err_type: str, variable: str) -> str:
+    return f"{ERR[err_type]}. {err_type}: {variable}"

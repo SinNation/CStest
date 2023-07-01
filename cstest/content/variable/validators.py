@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from cstest.content.errors.error import var_error_string
+from cstest.content.errors.error import error_string
 from cstest.content.variable.constants import INVALID_VAR_SYMBOLS
 from cstest.content.variable.exceptions import NoVariableNameValue
 
@@ -35,9 +35,9 @@ class CallVarValidator:
         """Checks the variable name passes all required checks"""
         errors: list = []
         if not self.is_first_alpha():
-            errors.append(var_error_string("first_alpha", self.name))
+            errors.append(error_string("first_alpha", "Variable", self.name))
         if self.inv_symbol():
-            errors.append(var_error_string("inv_symbol", self.name))
+            errors.append(error_string("inv_symbol", "Variable", self.name))
 
         return errors
 

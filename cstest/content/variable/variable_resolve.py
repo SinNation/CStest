@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Tuple
 
-from cstest.content.errors.error import var_error_string
+from cstest.content.errors.error import error_string
 from cstest.content.variable.validators import CallVarValidator
 
 
@@ -55,7 +55,7 @@ class ResolveBaseVar(Resolver):
         if CallVarValidator(self.call_name, list(game_variables.keys())).is_defined():
             return [], self.call_name, game_variables[self.call_name]
         else:
-            return [var_error_string("inv_var", self.call_name)], "", ""
+            return [error_string("inv_var", "Variable", self.call_name)], "", ""
 
     def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
         errors = self.validate_struct()
@@ -74,7 +74,7 @@ class ResolveHashVar(Resolver):
 
         errors = []
         if not CallVarValidator(self.call_name).single_hash():
-            return [var_error_string("multiple_hash", self.call_name)]
+            return [error_string("multiple_hash", "Variable", self.call_name)]
 
         # If more than one hash (above), then can't correctly split and
         # evaluate the two components of the variable call
@@ -82,7 +82,7 @@ class ResolveHashVar(Resolver):
         split = self.splitter()
         errors.extend(CallVarValidator(split[0]).is_name_valid())
         if not CallVarValidator(split[1]).hash_is_number():
-            errors.append(var_error_string("hash_not_number", self.call_name))
+            errors.append(error_string("hash_not_number", "Variable", self.call_name))
 
         return errors
 
@@ -102,7 +102,7 @@ class ResolveHashVar(Resolver):
                 out_val = str(value)[split_val]  # Slice variable value using hash val
                 return errors, self.call_name, out_val
             except IndexError:
-                return [var_error_string("inv_hash", self.call_name)], "", ""
+                return [error_string("inv_hash", "Variable", self.call_name)], "", ""
         else:
             return errors, "", ""
 
@@ -123,9 +123,9 @@ class ResolveBracketVar(Resolver):
 
         errors = []
         if CallVarValidator(self.call_name).is_first_bracket():
-            errors.append(var_error_string("first_alpha", self.call_name))
+            errors.append(error_string("first_alpha", "Variable", self.call_name))
         if not CallVarValidator(self.call_name).is_equal_bracket():
-            errors.append(var_error_string("mismatch_bracket", self.call_name))
+            errors.append(error_string("mismatch_bracket", "Variable", self.call_name))
 
         if errors:
             return errors
@@ -135,7 +135,9 @@ class ResolveBracketVar(Resolver):
             if "#" in var:
                 # Specific validation of hash when included as part of a bracket var
                 if not CallVarValidator(var).hash_correct_place():
-                    errors.append(var_error_string("hash_place", self.call_name))
+                    errors.append(
+                        error_string("hash_place", "Variable", self.call_name)
+                    )
                 # Then usual validation of a hash variable
                 errors.extend(ResolveHashVar(var.replace("]", "")).validate_struct())
 
