@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cstest.constants import DATA_PATH, PROJECTS_PATH, TIMESTAMP
+from cstest.project.constants import DATA_PATH, PROJECTS_PATH, TIMESTAMP
 
 
 @dataclass

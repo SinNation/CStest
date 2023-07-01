@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from cstest.constants import ERRORS
 from cstest.content.condition import condition as c
+from cstest.project.constants import ERRORS
 
 
 @pytest.mark.parametrize(

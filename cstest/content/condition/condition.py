@@ -8,8 +8,8 @@ import ast
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
-from cstest.constants import CONNECTORS, IF_COMMANDS, OPERATORS
 from cstest.content.condition.params import recode_params, validate_params
+from cstest.project.constants import CONNECTORS, IF_COMMANDS, OPERATORS
 
 # if var = 1
 # if var = "str"

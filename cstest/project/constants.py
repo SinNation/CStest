@@ -26,13 +26,13 @@ IF_COMMANDS = {
 
 @dataclass
 class CommandType:
-    variable_handle_type: str
+    handler: str
     conditional: bool
     effect: bool
     name: str
 
 
-class Commands(Enum):
+class Command(Enum):
     PROSE = CommandType("prose", False, False, "*PROSE")
     CREATE = CommandType("creation", False, True, "*CREATE")
     TEMP = CommandType("creation", False, True, "*TEMP")

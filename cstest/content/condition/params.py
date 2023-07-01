@@ -1,6 +1,6 @@
 from typing import Any, Tuple
 
-from cstest.constants import ERRORS, OPERATORS
+from cstest.project.constants import ERRORS, OPERATORS
 
 
 def is_num(param: Any) -> bool:
