@@ -200,4 +200,5 @@ class ResolveBracketVar(Resolver):
         return full_errors, "", ""
 
     def val_process(self, game_variables: dict[str, Any]) -> Tuple[list[str], str, Any]:
-        return [], "", ""
+        errors = self.validate_struct()
+        return (self.resolve(game_variables)) if not errors else (errors, "", "")

@@ -2,11 +2,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
+from cstest.constants import Command
 from cstest.content.effects.effect import Effect
 from cstest.content.errors.error import error_string
 from cstest.content.lines import handler as h
 from cstest.content.processors.processor import Processor
-from cstest.project.constants import Command
 
 
 @dataclass
@@ -54,5 +54,6 @@ class Line:
     def process_line(self) -> None:
         self.calc_indent()
         self.create_clean_line()
+        self.set_command()
         self.identify_effect_processor()
         self.effect.define_effect()
